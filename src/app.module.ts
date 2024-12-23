@@ -4,6 +4,7 @@ import { DynamoDBModule } from './dynamodb/dynamodb.module';
 import { AuthorsModule } from './authors/authors.module';
 import { CategoriesModule } from './categories/categories.module';
 import { BooksModule } from './books/books.module';
+import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { BooksModule } from './books/books.module';
     AuthorsModule,
     CategoriesModule,
     BooksModule,
+    AuthModule
   ],
 })
 export class AppModule {}
