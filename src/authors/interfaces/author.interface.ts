@@ -9,4 +9,5 @@ export interface Author {
   genres: string[];
   booksCount: number;
   imageUrl?: string;
+  createdAt: string;
 }
