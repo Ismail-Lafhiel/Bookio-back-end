@@ -4,4 +4,5 @@ export interface Category {
   description: string;
   booksCount: number;
   createdAt: string;
+  updatedAt: string;
 }

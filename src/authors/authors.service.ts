@@ -49,6 +49,7 @@ export class AuthorsService {
         ...createAuthorDto,
         booksCount: 0,
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
       };
 
       const command = new PutCommand({
@@ -130,12 +131,22 @@ export class AuthorsService {
       });
 
       const response = await this.dynamoDBService.documentClient.send(command);
-      return (response.Items || []) as Author[];
+
+      if (!response.Items || response.Items.length === 0) {
+        throw new AuthorNotFoundException(
+          `Author with name "${name}" does not exist`,
+        );
+      }
+
+      return response.Items as Author[];
     } catch (error) {
       this.logger.error(
         `Failed to fetch authors by name ${name}: ${error.message}`,
         error.stack,
       );
+      if (error instanceof AuthorNotFoundException) {
+        throw error;
+      }
       throw new AuthorCreateException(error.message);
     }
   }
@@ -176,7 +187,6 @@ export class AuthorsService {
         }
       });
 
-      // Add updatedAt timestamp
       updateExpression.push('#updatedAt = :updatedAt');
       expressionAttributeNames['#updatedAt'] = 'updatedAt';
       expressionAttributeValues[':updatedAt'] = new Date().toISOString();

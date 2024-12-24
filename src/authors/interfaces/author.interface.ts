@@ -10,4 +10,5 @@ export interface Author {
   booksCount: number;
   imageUrl?: string;
   createdAt: string;
+  updatedAt: string
 }

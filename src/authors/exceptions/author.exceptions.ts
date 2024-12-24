@@ -2,11 +2,13 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 
 export class AuthorNotFoundException extends HttpException {
-    constructor(identifier: string) {
-      super(`Author with identifier "${identifier}" not found`, HttpStatus.NOT_FOUND);
-    }
+  constructor(identifier: string) {
+    super(
+      `Author with identifier "${identifier}" not found`,
+      HttpStatus.NOT_FOUND,
+    );
   }
-  
+}
 
 export class AuthorAlreadyExistsException extends HttpException {
   constructor(email: string) {

@@ -51,6 +51,7 @@ export class CategoriesService {
         id: uuidv4(),
         ...createCategoryDto,
         createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
         booksCount: 0,
       };
 
@@ -207,6 +208,10 @@ export class CategoriesService {
         expressionAttributeValues[':description'] =
           updateCategoryDto.description;
       }
+
+      updateExpression.push('#updatedAt = :updatedAt');
+      expressionAttributeNames['#updatedAt'] = 'updatedAt';
+      expressionAttributeValues[':updatedAt'] = new Date().toISOString();
 
       const command = new UpdateCommand({
         TableName: this.tableName,
