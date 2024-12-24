@@ -9,6 +9,7 @@ import {
   Min,
   Max,
   Length,
+  IsUrl,
 } from 'class-validator';
 import { BookStatus } from '../interfaces/book.interface';
 
@@ -53,4 +54,12 @@ export class CreateBookDto {
   @Min(0, { message: 'Quantity cannot be negative' })
   @IsOptional()
   quantity?: number;
+
+  @IsUrl({}, { message: 'Cover URL must be a valid URL' })
+  @IsOptional()
+  coverUrl?: string;
+
+  @IsUrl({}, { message: 'PDF URL must be a valid URL' })
+  @IsOptional()
+  pdfUrl?: string;
 }

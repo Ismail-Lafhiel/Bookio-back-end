@@ -9,6 +9,8 @@ export interface Book {
   publishedYear?: number;
   borrowerId?: string;
   quantity?: number;
+  coverUrl?: string;
+  pdfUrl?: string;
   createdAt: string;
   updatedAt: string;
 }

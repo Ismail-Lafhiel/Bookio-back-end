@@ -19,15 +19,23 @@ import {
   BookUpdateException,
   BookDeleteException,
 } from './exceptions/book.exceptions';
+import { S3Service } from 'src/s3/s3.service';
 
 @Injectable()
 export class BooksService {
   private readonly tableName = 'Books';
   private readonly logger = new Logger(BooksService.name);
 
-  constructor(private readonly dynamoDBService: DynamoDBService) {}
+  constructor(
+    private readonly dynamoDBService: DynamoDBService,
+    private readonly s3Service: S3Service,
+  ) {}
 
-  async create(createBookDto: CreateBookDto): Promise<Book> {
+  async create(
+    createBookDto: CreateBookDto,
+    coverFile?: Express.Multer.File,
+    pdfFile?: Express.Multer.File,
+  ): Promise<Book> {
     try {
       // Check for existing book with same ISBN
       const existingBooks = await this.findByISBN(createBookDto.isbn).catch(
@@ -43,9 +51,22 @@ export class BooksService {
         throw new BookAlreadyExistsException(createBookDto.isbn);
       }
 
+      let coverUrl: string | undefined;
+      let pdfUrl: string | undefined;
+
+      if (coverFile) {
+        coverUrl = await this.s3Service.uploadFile(coverFile, 'books_covers');
+      }
+
+      if (pdfFile) {
+        pdfUrl = await this.s3Service.uploadFile(pdfFile, 'books_pdfs');
+      }
+
       const book: Book = {
         id: uuidv4(),
         ...createBookDto,
+        coverUrl,
+        pdfUrl,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -133,25 +154,24 @@ export class BooksService {
     }
   }
 
-  async update(id: string, updateBookDto: UpdateBookDto): Promise<Book> {
+  async update(
+    id: string,
+    updateBookDto: UpdateBookDto,
+    coverFile?: Express.Multer.File,
+    pdfFile?: Express.Multer.File,
+  ): Promise<Book> {
     try {
-      // Check if book exists
       const existingBook = await this.findOne(id);
 
-      // If ISBN is being updated, check for duplicates
-      if (updateBookDto.isbn && updateBookDto.isbn !== existingBook.isbn) {
-        const existingBooks = await this.findByISBN(updateBookDto.isbn).catch(
-          (error) => {
-            if (error instanceof BookNotFoundException) {
-              return [];
-            }
-            throw error;
-          },
-        );
+      let coverUrl = existingBook.coverUrl;
+      let pdfUrl = existingBook.pdfUrl;
 
-        if (existingBooks && existingBooks.length > 0) {
-          throw new BookAlreadyExistsException(updateBookDto.isbn);
-        }
+      if (coverFile) {
+        coverUrl = await this.s3Service.uploadFile(coverFile, 'books_covers');
+      }
+
+      if (pdfFile) {
+        pdfUrl = await this.s3Service.uploadFile(pdfFile, 'books_pdfs');
       }
 
       const updateExpression: string[] = [];
@@ -165,6 +185,18 @@ export class BooksService {
           expressionAttributeValues[`:${key}`] = value;
         }
       });
+
+      if (coverUrl !== existingBook.coverUrl) {
+        updateExpression.push('#coverUrl = :coverUrl');
+        expressionAttributeNames['#coverUrl'] = 'coverUrl';
+        expressionAttributeValues[':coverUrl'] = coverUrl;
+      }
+
+      if (pdfUrl !== existingBook.pdfUrl) {
+        updateExpression.push('#pdfUrl = :pdfUrl');
+        expressionAttributeNames['#pdfUrl'] = 'pdfUrl';
+        expressionAttributeValues[':pdfUrl'] = pdfUrl;
+      }
 
       // Add updatedAt timestamp
       updateExpression.push('#updatedAt = :updatedAt');

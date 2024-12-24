@@ -12,7 +12,10 @@ import {
   HttpStatus,
   Query,
   ValidationPipe,
+  UploadedFiles,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
 import { BooksService } from './books.service';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
@@ -28,12 +31,20 @@ export class BooksController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FilesInterceptor('files'))
   async create(
     @Body(new ValidationPipe({ transform: true })) createBookDto: CreateBookDto,
+    @UploadedFiles() files: Express.Multer.File[],
   ): Promise<Book> {
     this.logger.log(`Creating new book with title: ${createBookDto.title}`);
     try {
-      const book = await this.booksService.create(createBookDto);
+      const coverFile = files.find((file) => file.fieldname === 'cover');
+      const pdfFile = files.find((file) => file.fieldname === 'pdf');
+      const book = await this.booksService.create(
+        createBookDto,
+        coverFile,
+        pdfFile,
+      );
       this.logger.log(`Book created successfully with ID: ${book.id}`);
       return book;
     } catch (error) {
@@ -89,13 +100,22 @@ export class BooksController {
 
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FilesInterceptor('files'))
   async update(
     @Param('id') id: string,
     @Body(new ValidationPipe({ transform: true })) updateBookDto: UpdateBookDto,
+    @UploadedFiles() files: Express.Multer.File[],
   ): Promise<Book> {
     this.logger.log(`Updating book with ID: ${id}`);
     try {
-      const book = await this.booksService.update(id, updateBookDto);
+      const coverFile = files.find((file) => file.fieldname === 'cover');
+      const pdfFile = files.find((file) => file.fieldname === 'pdf');
+      const book = await this.booksService.update(
+        id,
+        updateBookDto,
+        coverFile,
+        pdfFile,
+      );
       this.logger.log(`Book ${id} updated successfully`);
       return book;
     } catch (error) {
