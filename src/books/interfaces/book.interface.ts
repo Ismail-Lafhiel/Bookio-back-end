@@ -6,11 +6,11 @@ export interface Book {
   isbn: string;
   status: BookStatus;
   description?: string;
-  publishedYear?: number;
+  publishedYear: number;
   borrowerId?: string;
-  quantity?: number;
-  coverUrl?: string;
-  pdfUrl?: string;
+  quantity: number;
+  cover: string;
+  pdf: string;
   createdAt: string;
   updatedAt: string;
 }

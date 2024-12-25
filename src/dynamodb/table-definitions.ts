@@ -49,16 +49,18 @@ export const BooksTableDefinition: CreateTableCommandInput = {
   KeySchema: [{ AttributeName: 'id', KeyType: 'HASH' }],
   AttributeDefinitions: [
     { AttributeName: 'id', AttributeType: 'S' },
-    { AttributeName: 'author', AttributeType: 'S' },
-    { AttributeName: 'category', AttributeType: 'S' },
+    { AttributeName: 'authorId', AttributeType: 'S' },
+    { AttributeName: 'categoryId', AttributeType: 'S' },
     { AttributeName: 'isbn', AttributeType: 'S' },
     { AttributeName: 'status', AttributeType: 'S' },
     { AttributeName: 'title', AttributeType: 'S' },
+    { AttributeName: 'cover', AttributeType: 'S' },
+    { AttributeName: 'pdf', AttributeType: 'S' },
   ],
   GlobalSecondaryIndexes: [
     {
       IndexName: 'AuthorIndex',
-      KeySchema: [{ AttributeName: 'author', KeyType: 'HASH' }],
+      KeySchema: [{ AttributeName: 'authorId', KeyType: 'HASH' }],
       Projection: { ProjectionType: 'ALL' },
       ProvisionedThroughput: {
         ReadCapacityUnits: 5,
@@ -67,7 +69,7 @@ export const BooksTableDefinition: CreateTableCommandInput = {
     },
     {
       IndexName: 'CategoryIndex',
-      KeySchema: [{ AttributeName: 'category', KeyType: 'HASH' }],
+      KeySchema: [{ AttributeName: 'categoryId', KeyType: 'HASH' }],
       Projection: { ProjectionType: 'ALL' },
       ProvisionedThroughput: {
         ReadCapacityUnits: 5,
@@ -95,6 +97,24 @@ export const BooksTableDefinition: CreateTableCommandInput = {
     {
       IndexName: 'TitleIndex',
       KeySchema: [{ AttributeName: 'title', KeyType: 'HASH' }],
+      Projection: { ProjectionType: 'ALL' },
+      ProvisionedThroughput: {
+        ReadCapacityUnits: 5,
+        WriteCapacityUnits: 5,
+      },
+    },
+    {
+      IndexName: 'CoverIndex',
+      KeySchema: [{ AttributeName: 'cover', KeyType: 'HASH' }],
+      Projection: { ProjectionType: 'ALL' },
+      ProvisionedThroughput: {
+        ReadCapacityUnits: 5,
+        WriteCapacityUnits: 5,
+      },
+    },
+    {
+      IndexName: 'PdfIndex',
+      KeySchema: [{ AttributeName: 'pdf', KeyType: 'HASH' }],
       Projection: { ProjectionType: 'ALL' },
       ProvisionedThroughput: {
         ReadCapacityUnits: 5,

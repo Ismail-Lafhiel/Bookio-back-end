@@ -8,12 +8,14 @@ import { AuthModule } from './auth/auth.module';
 
 @Module({
   imports: [
-    ConfigModule.forRoot(),
+    ConfigModule.forRoot({
+      isGlobal: true,
+    }),
     DynamoDBModule,
     AuthorsModule,
     CategoriesModule,
     BooksModule,
-    AuthModule
+    AuthModule,
   ],
 })
 export class AppModule {}

@@ -1,8 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { DynamoDBService } from '../dynamodb/dynamodb.service';
+import { S3Service } from '../s3/s3.service';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
-import { Book } from './interfaces/book.interface';
+import { Book, BookStatus } from './interfaces/book.interface';
 import { v4 as uuidv4 } from 'uuid';
 import {
   PutCommand,
@@ -10,16 +11,7 @@ import {
   ScanCommand,
   UpdateCommand,
   DeleteCommand,
-  QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
-import {
-  BookNotFoundException,
-  BookAlreadyExistsException,
-  BookCreateException,
-  BookUpdateException,
-  BookDeleteException,
-} from './exceptions/book.exceptions';
-import { S3Service } from 'src/s3/s3.service';
 
 @Injectable()
 export class BooksService {
@@ -33,227 +25,177 @@ export class BooksService {
 
   async create(
     createBookDto: CreateBookDto,
-    coverFile?: Express.Multer.File,
-    pdfFile?: Express.Multer.File,
+    files: { cover?: Express.Multer.File[]; pdf?: Express.Multer.File[] },
   ): Promise<Book> {
     try {
-      // Check for existing book with same ISBN
-      const existingBooks = await this.findByISBN(createBookDto.isbn).catch(
-        (error) => {
-          if (error instanceof BookNotFoundException) {
-            return [];
-          }
-          throw error;
-        },
+      if (!files.cover?.[0] || !files.pdf?.[0]) {
+        throw new Error('Both cover and PDF files are required');
+      }
+
+      // Upload files to S3
+      const coverUrl = await this.s3Service.uploadFile(
+        files.cover[0],
+        'books/covers',
       );
-
-      if (existingBooks && existingBooks.length > 0) {
-        throw new BookAlreadyExistsException(createBookDto.isbn);
-      }
-
-      let coverUrl: string | undefined;
-      let pdfUrl: string | undefined;
-
-      if (coverFile) {
-        coverUrl = await this.s3Service.uploadFile(coverFile, 'books_covers');
-      }
-
-      if (pdfFile) {
-        pdfUrl = await this.s3Service.uploadFile(pdfFile, 'books_pdfs');
-      }
+      const pdfUrl = await this.s3Service.uploadFile(
+        files.pdf[0],
+        'books/pdfs',
+      );
 
       const book: Book = {
         id: uuidv4(),
         ...createBookDto,
-        coverUrl,
-        pdfUrl,
+        status: BookStatus.AVAILABLE,
+        cover: coverUrl,
+        pdf: pdfUrl,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
 
-      const command = new PutCommand({
-        TableName: this.tableName,
-        Item: book,
-        ConditionExpression: 'attribute_not_exists(id)',
-      });
+      await this.dynamoDBService.documentClient.send(
+        new PutCommand({
+          TableName: this.tableName,
+          Item: book,
+          ConditionExpression: 'attribute_not_exists(id)',
+        }),
+      );
 
-      await this.dynamoDBService.documentClient.send(command);
-      this.logger.log(`Created book with ID: ${book.id}`);
       return book;
     } catch (error) {
       this.logger.error(`Failed to create book: ${error.message}`, error.stack);
-      if (error instanceof BookAlreadyExistsException) {
-        throw error;
-      }
-      throw new BookCreateException(error.message);
+      throw error;
     }
   }
 
   async findAll(): Promise<Book[]> {
     try {
-      const command = new ScanCommand({
-        TableName: this.tableName,
-      });
-
-      const response = await this.dynamoDBService.documentClient.send(command);
-      return response.Items as Book[];
+      const result = await this.dynamoDBService.documentClient.send(
+        new ScanCommand({
+          TableName: this.tableName,
+        }),
+      );
+      return result.Items as Book[];
     } catch (error) {
       this.logger.error(`Failed to fetch books: ${error.message}`, error.stack);
-      throw new BookCreateException(error.message);
+      throw error;
     }
   }
 
   async findOne(id: string): Promise<Book> {
     try {
-      const command = new GetCommand({
-        TableName: this.tableName,
-        Key: { id },
-      });
+      const result = await this.dynamoDBService.documentClient.send(
+        new GetCommand({
+          TableName: this.tableName,
+          Key: { id },
+        }),
+      );
 
-      const response = await this.dynamoDBService.documentClient.send(command);
-
-      if (!response.Item) {
-        throw new BookNotFoundException(id);
+      if (!result.Item) {
+        throw new NotFoundException(`Book with ID "${id}" not found`);
       }
 
-      return response.Item as Book;
+      return result.Item as Book;
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch book ${id}: ${error.message}`,
-        error.stack,
-      );
-      if (error instanceof BookNotFoundException) {
-        throw error;
-      }
-      throw new BookCreateException(error.message);
-    }
-  }
-
-  async findByISBN(isbn: string): Promise<Book[]> {
-    try {
-      const command = new QueryCommand({
-        TableName: this.tableName,
-        IndexName: 'ISBNIndex',
-        KeyConditionExpression: '#isbn = :isbn',
-        ExpressionAttributeNames: {
-          '#isbn': 'isbn',
-        },
-        ExpressionAttributeValues: {
-          ':isbn': isbn,
-        },
-      });
-
-      const response = await this.dynamoDBService.documentClient.send(command);
-      return (response.Items || []) as Book[];
-    } catch (error) {
-      this.logger.error(
-        `Failed to fetch books by ISBN ${isbn}: ${error.message}`,
-        error.stack,
-      );
-      throw new BookCreateException(error.message);
+      this.logger.error(`Failed to fetch book: ${error.message}`, error.stack);
+      throw error;
     }
   }
 
   async update(
     id: string,
     updateBookDto: UpdateBookDto,
-    coverFile?: Express.Multer.File,
-    pdfFile?: Express.Multer.File,
+    files: { cover?: Express.Multer.File[]; pdf?: Express.Multer.File[] },
   ): Promise<Book> {
     try {
       const existingBook = await this.findOne(id);
 
-      let coverUrl = existingBook.coverUrl;
-      let pdfUrl = existingBook.pdfUrl;
+      let updateExpression = 'SET updatedAt = :updatedAt';
+      const expressionAttributeValues: any = {
+        ':updatedAt': new Date().toISOString(),
+      };
+      const expressionAttributeNames: any = {};
 
-      if (coverFile) {
-        coverUrl = await this.s3Service.uploadFile(coverFile, 'books_covers');
+      // Handle file updates
+      if (files.cover?.[0]) {
+        const coverUrl = await this.s3Service.uploadFile(
+          files.cover[0],
+          'books/covers',
+        );
+        updateExpression += ', #cover = :cover';
+        expressionAttributeValues[':cover'] = coverUrl;
+        expressionAttributeNames['#cover'] = 'cover';
+
+        // Delete old cover if exists
+        if (existingBook.cover) {
+          await this.s3Service.deleteFile(existingBook.cover);
+        }
       }
 
-      if (pdfFile) {
-        pdfUrl = await this.s3Service.uploadFile(pdfFile, 'books_pdfs');
+      if (files.pdf?.[0]) {
+        const pdfUrl = await this.s3Service.uploadFile(
+          files.pdf[0],
+          'books/pdfs',
+        );
+        updateExpression += ', #pdf = :pdf';
+        expressionAttributeValues[':pdf'] = pdfUrl;
+        expressionAttributeNames['#pdf'] = 'pdf';
+
+        // Delete old PDF if exists
+        if (existingBook.pdf) {
+          await this.s3Service.deleteFile(existingBook.pdf);
+        }
       }
 
-      const updateExpression: string[] = [];
-      const expressionAttributeNames: Record<string, string> = {};
-      const expressionAttributeValues: Record<string, any> = {};
-
+      // Handle other fields
       Object.entries(updateBookDto).forEach(([key, value]) => {
-        if (value !== undefined) {
-          updateExpression.push(`#${key} = :${key}`);
-          expressionAttributeNames[`#${key}`] = key;
+        if (value !== undefined && !['id', 'createdAt', 'updatedAt'].includes(key)) {
+          updateExpression += `, #${key} = :${key}`;
           expressionAttributeValues[`:${key}`] = value;
+          expressionAttributeNames[`#${key}`] = key;
         }
       });
 
-      if (coverUrl !== existingBook.coverUrl) {
-        updateExpression.push('#coverUrl = :coverUrl');
-        expressionAttributeNames['#coverUrl'] = 'coverUrl';
-        expressionAttributeValues[':coverUrl'] = coverUrl;
-      }
-
-      if (pdfUrl !== existingBook.pdfUrl) {
-        updateExpression.push('#pdfUrl = :pdfUrl');
-        expressionAttributeNames['#pdfUrl'] = 'pdfUrl';
-        expressionAttributeValues[':pdfUrl'] = pdfUrl;
-      }
-
-      // Add updatedAt timestamp
-      updateExpression.push('#updatedAt = :updatedAt');
-      expressionAttributeNames['#updatedAt'] = 'updatedAt';
-      expressionAttributeValues[':updatedAt'] = new Date().toISOString();
-
-      const command = new UpdateCommand({
-        TableName: this.tableName,
-        Key: { id },
-        UpdateExpression: `SET ${updateExpression.join(', ')}`,
-        ExpressionAttributeNames: expressionAttributeNames,
-        ExpressionAttributeValues: expressionAttributeValues,
-        ReturnValues: 'ALL_NEW',
-      });
-
-      const response = await this.dynamoDBService.documentClient.send(command);
-      this.logger.log(`Updated book with ID: ${id}`);
-      return response.Attributes as Book;
-    } catch (error) {
-      this.logger.error(
-        `Failed to update book ${id}: ${error.message}`,
-        error.stack,
+      const result = await this.dynamoDBService.documentClient.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: { id },
+          UpdateExpression: updateExpression,
+          ExpressionAttributeValues: expressionAttributeValues,
+          ExpressionAttributeNames: expressionAttributeNames,
+          ReturnValues: 'ALL_NEW',
+          ConditionExpression: 'attribute_exists(id)',
+        }),
       );
-      if (
-        error instanceof BookNotFoundException ||
-        error instanceof BookAlreadyExistsException
-      ) {
-        throw error;
-      }
-      throw new BookUpdateException(error.message);
+
+      return result.Attributes as Book;
+    } catch (error) {
+      this.logger.error(`Failed to update book: ${error.message}`, error.stack);
+      throw error;
     }
   }
 
-  async remove(id: string): Promise<{ message: string }> {
+  async remove(id: string): Promise<void> {
     try {
       const book = await this.findOne(id);
 
-      const command = new DeleteCommand({
-        TableName: this.tableName,
-        Key: { id },
-      });
-
-      await this.dynamoDBService.documentClient.send(command);
-      this.logger.log(`Deleted book with ID: ${id}`);
-
-      return {
-        message: `Book with ID "${id}" has been successfully deleted`,
-      };
-    } catch (error) {
-      this.logger.error(
-        `Failed to delete book ${id}: ${error.message}`,
-        error.stack,
-      );
-      if (error instanceof BookNotFoundException) {
-        throw error;
+      // Delete files from S3
+      if (book.cover) {
+        await this.s3Service.deleteFile(book.cover);
       }
-      throw new BookDeleteException(error.message);
+      if (book.pdf) {
+        await this.s3Service.deleteFile(book.pdf);
+      }
+
+      await this.dynamoDBService.documentClient.send(
+        new DeleteCommand({
+          TableName: this.tableName,
+          Key: { id },
+          ConditionExpression: 'attribute_exists(id)',
+        }),
+      );
+    } catch (error) {
+      this.logger.error(`Failed to delete book: ${error.message}`, error.stack);
+      throw error;
     }
   }
 }
