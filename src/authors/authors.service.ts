@@ -34,7 +34,11 @@ export class AuthorsService {
 
   async create(createAuthorDto: CreateAuthorDto, profilePicture?: Express.Multer.File): Promise<Author> {
     try {
-      // Check for existing author with same name
+      // Validate profile field to only accept images
+      if (profilePicture && !profilePicture.mimetype.startsWith('image/')) {
+        throw new Error('Profile must be an image file');
+      }
+
       const existingAuthors = await this.findByName(createAuthorDto.name).catch(
         (error) => {
           if (error instanceof AuthorNotFoundException) {
@@ -161,8 +165,13 @@ export class AuthorsService {
     }
   }
 
-  async update(id: string, updateAuthorDto: UpdateAuthorDto): Promise<Author> {
+  async update(id: string, updateAuthorDto: UpdateAuthorDto, profilePicture?: Express.Multer.File): Promise<Author> {
     try {
+      // Validate profile field to only accept images
+      if (profilePicture && !profilePicture.mimetype.startsWith('image/')) {
+        throw new Error('Profile must be an image file');
+      }
+
       // Check if author exists
       const existingAuthor = await this.findOne(id);
 
@@ -185,6 +194,11 @@ export class AuthorsService {
         }
       }
 
+      let profileUrl: string | undefined;
+      if (profilePicture) {
+        profileUrl = await this.s3Service.uploadFile(profilePicture, 'authors/profiles');
+      }
+
       const updateExpression: string[] = [];
       const expressionAttributeNames: Record<string, string> = {};
       const expressionAttributeValues: Record<string, any> = {};
@@ -196,6 +210,12 @@ export class AuthorsService {
           expressionAttributeValues[`:${key}`] = value;
         }
       });
+
+      if (profileUrl) {
+        updateExpression.push('#profile = :profile');
+        expressionAttributeNames['#profile'] = 'profile';
+        expressionAttributeValues[':profile'] = profileUrl;
+      }
 
       updateExpression.push('#updatedAt = :updatedAt');
       expressionAttributeNames['#updatedAt'] = 'updatedAt';

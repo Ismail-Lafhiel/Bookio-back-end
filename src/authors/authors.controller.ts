@@ -91,13 +91,15 @@ export class AuthorsController {
 
   @Patch(':id')
   @HttpCode(HttpStatus.OK)
+  @UseInterceptors(FileInterceptor('profilePicture'))
   async update(
     @Param('id') id: string,
     @Body(new ValidationPipe({ transform: true })) updateAuthorDto: UpdateAuthorDto,
+    @UploadedFile() profilePicture: Express.Multer.File,
   ): Promise<Author> {
     this.logger.log(`Updating author with ID: ${id}`);
     try {
-      const author = await this.authorsService.update(id, updateAuthorDto);
+      const author = await this.authorsService.update(id, updateAuthorDto, profilePicture);
       this.logger.log(`Author ${id} updated successfully`);
       return author;
     } catch (error) {
