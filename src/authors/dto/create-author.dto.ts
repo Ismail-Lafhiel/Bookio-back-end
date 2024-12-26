@@ -8,7 +8,23 @@ import {
   MinLength,
   MaxLength,
   ArrayMinSize,
+  ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
+
+class SocialMedia {
+  @IsUrl()
+  @IsOptional()
+  facebook?: string;
+
+  @IsUrl()
+  @IsOptional()
+  twitter?: string;
+
+  @IsUrl()
+  @IsOptional()
+  website?: string;
+}
 
 export class CreateAuthorDto {
   @IsString()
@@ -37,16 +53,13 @@ export class CreateAuthorDto {
   @IsNotEmpty()
   email: string;
 
-  @IsUrl()
-  @IsOptional()
-  website?: string;
-
   @IsArray()
   @ArrayMinSize(1)
   @IsString({ each: true })
   genres: string[];
 
-  @IsUrl()
+  @ValidateNested()
   @IsOptional()
-  imageUrl?: string;
+  @Type(() => SocialMedia)
+  socialMedia?: string[];
 }

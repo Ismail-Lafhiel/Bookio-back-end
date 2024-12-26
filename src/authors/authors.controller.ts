@@ -12,7 +12,10 @@ import {
   HttpStatus,
   Query,
   ValidationPipe,
+  UploadedFile,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthorsService } from './authors.service';
 import { CreateAuthorDto } from './dto/create-author.dto';
 import { UpdateAuthorDto } from './dto/update-author.dto';
@@ -28,12 +31,14 @@ export class AuthorsController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @UseInterceptors(FileInterceptor('profilePicture'))
   async create(
     @Body(new ValidationPipe({ transform: true })) createAuthorDto: CreateAuthorDto,
+    @UploadedFile() profilePicture: Express.Multer.File,
   ): Promise<Author> {
     this.logger.log(`Creating new author with name: ${createAuthorDto.name}`);
     try {
-      const author = await this.authorsService.create(createAuthorDto);
+      const author = await this.authorsService.create(createAuthorDto, profilePicture);
       this.logger.log(`Author created successfully with ID: ${author.id}`);
       return author;
     } catch (error) {

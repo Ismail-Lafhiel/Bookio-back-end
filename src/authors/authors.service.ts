@@ -20,15 +20,19 @@ import {
   AuthorUpdateException,
   AuthorDeleteException,
 } from './exceptions/author.exceptions';
+import { S3Service } from '../s3/s3.service';
 
 @Injectable()
 export class AuthorsService {
   private readonly tableName = 'Authors';
   private readonly logger = new Logger(AuthorsService.name);
 
-  constructor(private readonly dynamoDBService: DynamoDBService) {}
+  constructor(
+    private readonly dynamoDBService: DynamoDBService,
+    private readonly s3Service: S3Service,
+  ) {}
 
-  async create(createAuthorDto: CreateAuthorDto): Promise<Author> {
+  async create(createAuthorDto: CreateAuthorDto, profilePicture?: Express.Multer.File): Promise<Author> {
     try {
       // Check for existing author with same name
       const existingAuthors = await this.findByName(createAuthorDto.name).catch(
@@ -44,9 +48,15 @@ export class AuthorsService {
         throw new AuthorAlreadyExistsException(createAuthorDto.name);
       }
 
+      let profileUrl: string | undefined;
+      if (profilePicture) {
+        profileUrl = await this.s3Service.uploadFile(profilePicture, 'authors/profiles');
+      }
+
       const author: Author = {
         id: uuidv4(),
         ...createAuthorDto,
+        profile: profileUrl,
         booksCount: 0,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),

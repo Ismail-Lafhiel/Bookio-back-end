@@ -5,10 +5,10 @@ export interface Author {
   birthDate: string;
   nationality: string;
   email: string;
-  website?: string;
+  socialMedia?: string[];
   genres: string[];
   booksCount: number;
-  imageUrl?: string;
+  profile?: string;
   createdAt: string;
-  updatedAt: string
+  updatedAt: string;
 }

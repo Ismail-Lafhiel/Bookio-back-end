@@ -5,20 +5,11 @@ export const AuthorsTableDefinition: CreateTableCommandInput = {
   KeySchema: [{ AttributeName: 'id', KeyType: 'HASH' }],
   AttributeDefinitions: [
     { AttributeName: 'id', AttributeType: 'S' },
-    { AttributeName: 'email', AttributeType: 'S' },
     { AttributeName: 'name', AttributeType: 'S' },
     { AttributeName: 'nationality', AttributeType: 'S' },
+    { AttributeName: 'email', AttributeType: 'S' },
   ],
   GlobalSecondaryIndexes: [
-    {
-      IndexName: 'EmailIndex',
-      KeySchema: [{ AttributeName: 'email', KeyType: 'HASH' }],
-      Projection: { ProjectionType: 'ALL' },
-      ProvisionedThroughput: {
-        ReadCapacityUnits: 5,
-        WriteCapacityUnits: 5,
-      },
-    },
     {
       IndexName: 'NameIndex',
       KeySchema: [{ AttributeName: 'name', KeyType: 'HASH' }],
@@ -31,6 +22,15 @@ export const AuthorsTableDefinition: CreateTableCommandInput = {
     {
       IndexName: 'NationalityIndex',
       KeySchema: [{ AttributeName: 'nationality', KeyType: 'HASH' }],
+      Projection: { ProjectionType: 'ALL' },
+      ProvisionedThroughput: {
+        ReadCapacityUnits: 5,
+        WriteCapacityUnits: 5,
+      },
+    },
+    {
+      IndexName: 'EmailIndex',
+      KeySchema: [{ AttributeName: 'email', KeyType: 'HASH' }],
       Projection: { ProjectionType: 'ALL' },
       ProvisionedThroughput: {
         ReadCapacityUnits: 5,
