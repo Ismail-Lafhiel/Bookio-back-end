@@ -198,4 +198,42 @@ export class BooksService {
       throw error;
     }
   }
+
+  async borrow(id: string, borrowerId: string): Promise<Book> {
+    try {
+      const book = await this.findOne(id);
+
+      if (book.status !== BookStatus.AVAILABLE) {
+        throw new Error(`Book with ID "${id}" is not available for borrowing`);
+      }
+
+      const updateExpression = 'SET #status = :status, #borrowerId = :borrowerId, updatedAt = :updatedAt';
+      const expressionAttributeValues = {
+        ':status': BookStatus.BORROWED,
+        ':borrowerId': borrowerId,
+        ':updatedAt': new Date().toISOString(),
+      };
+      const expressionAttributeNames = {
+        '#status': 'status',
+        '#borrowerId': 'borrowerId',
+      };
+
+      const result = await this.dynamoDBService.documentClient.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: { id },
+          UpdateExpression: updateExpression,
+          ExpressionAttributeValues: expressionAttributeValues,
+          ExpressionAttributeNames: expressionAttributeNames,
+          ReturnValues: 'ALL_NEW',
+          ConditionExpression: 'attribute_exists(id)',
+        }),
+      );
+
+      return result.Attributes as Book;
+    } catch (error) {
+      this.logger.error(`Failed to borrow book: ${error.message}`, error.stack);
+      throw new Error(`Failed to borrow book: ${error.message}`);
+    }
+  }
 }

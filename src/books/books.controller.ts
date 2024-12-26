@@ -11,12 +11,15 @@ import {
   ParseUUIDPipe,
   BadRequestException,
   ValidationPipe,
+  UseGuards,
+  Request,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { BooksService } from './books.service';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { Book } from './interfaces/book.interface';
+import { CognitoAuthGuard } from 'src/auth/cognito.guard';
 
 @Controller('books')
 export class BooksController {
@@ -134,6 +137,16 @@ export class BooksController {
     },
   ): Promise<Book> {
     return this.booksService.update(id, updateBookDto, files);
+  }
+
+  @Patch(':id/borrow')
+  @UseGuards(CognitoAuthGuard)
+  async borrow(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req,
+  ): Promise<Book> {
+    const borrowerId = req.user.sub;
+    return this.booksService.borrow(id, borrowerId);
   }
 
   @Delete(':id')
