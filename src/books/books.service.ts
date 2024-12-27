@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { DynamoDBService } from '../dynamodb/dynamodb.service';
 import { S3Service } from '../s3/s3.service';
 import { CreateBookDto } from './dto/create-book.dto';
@@ -204,18 +204,35 @@ export class BooksService {
       const book = await this.findOne(id);
 
       if (book.status !== BookStatus.AVAILABLE) {
-        throw new Error(`Book with ID "${id}" is not available for borrowing`);
+        throw new BadRequestException(`Book with ID "${id}" is not available for borrowing`);
       }
 
-      const updateExpression = 'SET #status = :status, #borrowerId = :borrowerId, updatedAt = :updatedAt';
+      const startDate = new Date().toISOString();
+      const returnDate = new Date();
+      returnDate.setDate(returnDate.getDate() + 14); // Assuming a 2-week borrowing period
+      const returnDateString = returnDate.toISOString();
+
+      let newStatus = BookStatus.BORROWED;
+      let newQuantity = book.quantity - 1;
+      if (newQuantity <= 0) {
+        newStatus = BookStatus.UNAVAILABLE;
+      }
+
+      const updateExpression = 'SET #status = :status, #borrowerId = :borrowerId, #quantity = :quantity, #startDate = :startDate, #returnDate = :returnDate, updatedAt = :updatedAt';
       const expressionAttributeValues = {
-        ':status': BookStatus.BORROWED,
+        ':status': newStatus,
         ':borrowerId': borrowerId,
+        ':quantity': newQuantity,
+        ':startDate': startDate,
+        ':returnDate': returnDateString,
         ':updatedAt': new Date().toISOString(),
       };
       const expressionAttributeNames = {
         '#status': 'status',
         '#borrowerId': 'borrowerId',
+        '#quantity': 'quantity',
+        '#startDate': 'startDate',
+        '#returnDate': 'returnDate',
       };
 
       const result = await this.dynamoDBService.documentClient.send(
@@ -232,8 +249,16 @@ export class BooksService {
 
       return result.Attributes as Book;
     } catch (error) {
-      this.logger.error(`Failed to borrow book: ${error.message}`, error.stack);
-      throw new Error(`Failed to borrow book: ${error.message}`);
+      if (error instanceof NotFoundException) {
+        this.logger.error(`Book not found: ${error.message}`, error.stack);
+        throw new NotFoundException(`Book with ID "${id}" not found`);
+      } else if (error instanceof BadRequestException) {
+        this.logger.error(`Book not available: ${error.message}`, error.stack);
+        throw error;
+      } else {
+        this.logger.error(`Failed to borrow book: ${error.message}`, error.stack);
+        throw new Error(`Failed to borrow book: ${error.message}`);
+      }
     }
   }
 }

@@ -13,9 +13,12 @@ export interface Book {
   pdf: string;
   createdAt: string;
   updatedAt: string;
+  startDate?: string;
+  returnDate?: string;
 }
 
 export enum BookStatus {
   AVAILABLE = 'AVAILABLE',
   BORROWED = 'BORROWED',
+  UNAVAILABLE = 'UNAVAILABLE',
 }
