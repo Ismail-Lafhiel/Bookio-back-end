@@ -13,6 +13,8 @@ import {
   DeleteCommand,
   QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
+import { CategoriesService } from '../categories/categories.service';
+import { AuthorsService } from '../authors/authors.service';
 
 @Injectable()
 export class BooksService {
@@ -22,6 +24,8 @@ export class BooksService {
   constructor(
     private readonly dynamoDBService: DynamoDBService,
     private readonly s3Service: S3Service,
+    private readonly categoriesService: CategoriesService,
+    private readonly authorsService: AuthorsService,
   ) {}
 
   async create(
@@ -60,6 +64,10 @@ export class BooksService {
           ConditionExpression: 'attribute_not_exists(id)',
         }),
       );
+
+      // Increment books count for category and author
+      await this.categoriesService.addBookToCategory(createBookDto.categoryId);
+      await this.authorsService.addBookToAuthor(createBookDto.authorId);
 
       return book;
     } catch (error) {

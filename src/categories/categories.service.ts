@@ -360,4 +360,17 @@ export class CategoriesService {
       throw error;
     }
   }
+
+  async addBookToCategory(categoryId: string): Promise<void> {
+    try {
+      await this.incrementBooksCount(categoryId);
+      this.logger.log(`Added book to category ${categoryId}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to add book to category ${categoryId}: ${error.message}`,
+        error.stack,
+      );
+      throw new CategoryUpdateException(error.message);
+    }
+  }
 }

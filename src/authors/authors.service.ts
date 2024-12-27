@@ -328,6 +328,19 @@ export class AuthorsService {
     }
   }
 
+  async addBookToAuthor(authorId: string): Promise<void> {
+    try {
+      await this.incrementBooksCount(authorId);
+      this.logger.log(`Added book to author ${authorId}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to add book to author ${authorId}: ${error.message}`,
+        error.stack,
+      );
+      throw new AuthorUpdateException(error.message);
+    }
+  }
+
   async findBooksByAuthor(authorId: string): Promise<Book[]> {
     try {
       const result = await this.dynamoDBService.documentClient.send(
