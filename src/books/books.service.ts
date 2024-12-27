@@ -74,7 +74,19 @@ export class BooksService {
           TableName: this.tableName,
         }),
       );
-      return result.Items as Book[];
+
+      const books = result.Items as Book[];
+
+      // Update status based on quantity
+      books.forEach(book => {
+        if (book.quantity > 0) {
+          book.status = BookStatus.AVAILABLE;
+        } else {
+          book.status = BookStatus.UNAVAILABLE;
+        }
+      });
+
+      return books;
     } catch (error) {
       this.logger.error(`Failed to fetch books: ${error.message}`, error.stack);
       throw error;
@@ -94,7 +106,16 @@ export class BooksService {
         throw new NotFoundException(`Book with ID "${id}" not found`);
       }
 
-      return result.Item as Book;
+      const book = result.Item as Book;
+
+      // Update status based on quantity
+      if (book.quantity > 0) {
+        book.status = BookStatus.AVAILABLE;
+      } else {
+        book.status = BookStatus.UNAVAILABLE;
+      }
+
+      return book;
     } catch (error) {
       this.logger.error(`Failed to fetch book: ${error.message}`, error.stack);
       throw error;
@@ -174,7 +195,7 @@ export class BooksService {
     }
   }
 
-  async remove(id: string): Promise<void> {
+  async remove(id: string): Promise<{ message: string }> {
     try {
       const book = await this.findOne(id);
 
@@ -193,6 +214,8 @@ export class BooksService {
           ConditionExpression: 'attribute_exists(id)',
         }),
       );
+
+      return { message: `Book with ID "${id}" has been successfully deleted` };
     } catch (error) {
       this.logger.error(`Failed to delete book: ${error.message}`, error.stack);
       throw error;
@@ -203,7 +226,7 @@ export class BooksService {
     try {
       const book = await this.findOne(id);
 
-      if (book.status !== BookStatus.AVAILABLE) {
+      if (book.quantity <= 0) {
         throw new BadRequestException(`Book with ID "${id}" is not available for borrowing`);
       }
 
@@ -212,15 +235,10 @@ export class BooksService {
       returnDate.setDate(returnDate.getDate() + 14); // Assuming a 2-week borrowing period
       const returnDateString = returnDate.toISOString();
 
-      let newStatus = BookStatus.BORROWED;
-      let newQuantity = book.quantity - 1;
-      if (newQuantity <= 0) {
-        newStatus = BookStatus.UNAVAILABLE;
-      }
+      const newQuantity = book.quantity - 1;
 
-      const updateExpression = 'SET #status = :status, #borrowerId = :borrowerId, #quantity = :quantity, #startDate = :startDate, #returnDate = :returnDate, updatedAt = :updatedAt';
+      const updateExpression = 'SET #borrowerId = :borrowerId, #quantity = :quantity, #startDate = :startDate, #returnDate = :returnDate, updatedAt = :updatedAt';
       const expressionAttributeValues = {
-        ':status': newStatus,
         ':borrowerId': borrowerId,
         ':quantity': newQuantity,
         ':startDate': startDate,
@@ -228,7 +246,6 @@ export class BooksService {
         ':updatedAt': new Date().toISOString(),
       };
       const expressionAttributeNames = {
-        '#status': 'status',
         '#borrowerId': 'borrowerId',
         '#quantity': 'quantity',
         '#startDate': 'startDate',
@@ -247,7 +264,10 @@ export class BooksService {
         }),
       );
 
-      return result.Attributes as Book;
+      const updatedBook = result.Attributes as Book;
+      updatedBook.status = BookStatus.BORROWED;
+
+      return updatedBook;
     } catch (error) {
       if (error instanceof NotFoundException) {
         this.logger.error(`Book not found: ${error.message}`, error.stack);

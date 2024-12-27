@@ -150,7 +150,7 @@ export class BooksController {
   }
 
   @Delete(':id')
-  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<void> {
+  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string }> {
     return this.booksService.remove(id);
   }
 }
