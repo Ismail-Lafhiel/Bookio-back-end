@@ -22,13 +22,13 @@ import { Category } from './interfaces/category.interface';
 import { Book } from 'src/books/interfaces/book.interface';
 
 @Controller('categories')
-@UseGuards(CognitoAuthGuard)
 export class CategoriesController {
   private readonly logger = new Logger(CategoriesController.name);
 
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Post()
+  @UseGuards(CognitoAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async create(
     @Body(new ValidationPipe({ transform: true }))
@@ -104,11 +104,13 @@ export class CategoriesController {
   }
 
   @Get(':id/books')
+  @HttpCode(HttpStatus.OK)
   async findBooksByCategory(@Param('id', ParseUUIDPipe) categoryId: string): Promise<Book[]> {
     return this.categoriesService.findBooksByCategory(categoryId);
   }
 
   @Patch(':id')
+  @UseGuards(CognitoAuthGuard)
   @HttpCode(HttpStatus.OK)
   async update(
     @Param('id') id: string,
@@ -133,6 +135,7 @@ export class CategoriesController {
   }
 
   @Delete(':id')
+  @UseGuards(CognitoAuthGuard)
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string): Promise<{ message: string }> {
     this.logger.log(`Deleting category with ID: ${id}`);

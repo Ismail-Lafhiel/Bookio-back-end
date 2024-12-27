@@ -26,6 +26,7 @@ export class BooksController {
   constructor(private readonly booksService: BooksService) {}
 
   @Post()
+  @UseGuards(CognitoAuthGuard)
   @UseInterceptors(
     FileFieldsInterceptor(
       [
@@ -101,6 +102,7 @@ export class BooksController {
   }
 
   @Patch(':id')
+  @UseGuards(CognitoAuthGuard)
   @UseInterceptors(
     FileFieldsInterceptor(
       [
@@ -160,6 +162,7 @@ export class BooksController {
   }
 
   @Delete(':id')
+  @UseGuards(CognitoAuthGuard)
   async remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string }> {
     return this.booksService.remove(id);
   }

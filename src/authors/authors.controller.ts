@@ -25,13 +25,13 @@ import { Author } from './interfaces/author.interface';
 import { Book } from 'src/books/interfaces/book.interface';
 
 @Controller('authors')
-@UseGuards(CognitoAuthGuard)
 export class AuthorsController {
   private readonly logger = new Logger(AuthorsController.name);
 
   constructor(private readonly authorsService: AuthorsService) {}
 
   @Post()
+  @UseGuards(CognitoAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor('profilePicture'))
   async create(
@@ -92,11 +92,13 @@ export class AuthorsController {
   }
 
   @Get(':id/books')
+  @HttpCode(HttpStatus.OK)
   async findBooksByAuthor(@Param('id', ParseUUIDPipe) authorId: string): Promise<Book[]> {
     return this.authorsService.findBooksByAuthor(authorId);
   }
 
   @Patch(':id')
+  @UseGuards(CognitoAuthGuard)
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(FileInterceptor('profilePicture'))
   async update(
@@ -116,6 +118,7 @@ export class AuthorsController {
   }
 
   @Delete(':id')
+  @UseGuards(CognitoAuthGuard)
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string): Promise<{ message: string }> {
     this.logger.log(`Deleting author with ID: ${id}`);
