@@ -90,6 +90,16 @@ export class BooksController {
     return this.booksService.findOne(id);
   }
 
+  @Get('category/:categoryId')
+  async findByCategory(@Param('categoryId', ParseUUIDPipe) categoryId: string): Promise<Book[]> {
+    return this.booksService.findByCategory(categoryId);
+  }
+
+  @Get('author/:authorId')
+  async findByAuthor(@Param('authorId', ParseUUIDPipe) authorId: string): Promise<Book[]> {
+    return this.booksService.findByAuthor(authorId);
+  }
+
   @Patch(':id')
   @UseInterceptors(
     FileFieldsInterceptor(

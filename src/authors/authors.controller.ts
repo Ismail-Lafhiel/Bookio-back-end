@@ -14,6 +14,7 @@ import {
   ValidationPipe,
   UploadedFile,
   UseInterceptors,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthorsService } from './authors.service';
@@ -21,6 +22,7 @@ import { CreateAuthorDto } from './dto/create-author.dto';
 import { UpdateAuthorDto } from './dto/update-author.dto';
 import { CognitoAuthGuard } from '../auth/cognito.guard';
 import { Author } from './interfaces/author.interface';
+import { Book } from 'src/books/interfaces/book.interface';
 
 @Controller('authors')
 @UseGuards(CognitoAuthGuard)
@@ -87,6 +89,11 @@ export class AuthorsController {
       this.logger.error(`Failed to fetch author: ${error.message}`, error.stack);
       throw error;
     }
+  }
+
+  @Get(':id/books')
+  async findBooksByAuthor(@Param('id', ParseUUIDPipe) authorId: string): Promise<Book[]> {
+    return this.authorsService.findBooksByAuthor(authorId);
   }
 
   @Patch(':id')

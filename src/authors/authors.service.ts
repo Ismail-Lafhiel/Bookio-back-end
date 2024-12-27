@@ -21,6 +21,7 @@ import {
   AuthorDeleteException,
 } from './exceptions/author.exceptions';
 import { S3Service } from '../s3/s3.service';
+import { Book, BookStatus } from 'src/books/interfaces/book.interface';
 
 @Injectable()
 export class AuthorsService {
@@ -324,6 +325,37 @@ export class AuthorsService {
         error.stack,
       );
       throw new AuthorUpdateException(error.message);
+    }
+  }
+
+  async findBooksByAuthor(authorId: string): Promise<Book[]> {
+    try {
+      const result = await this.dynamoDBService.documentClient.send(
+        new QueryCommand({
+          TableName: 'Books',
+          IndexName: 'AuthorIndex',
+          KeyConditionExpression: 'authorId = :authorId',
+          ExpressionAttributeValues: {
+            ':authorId': authorId,
+          },
+        }),
+      );
+
+      const books = result.Items as Book[];
+
+      // Update status based on quantity
+      books.forEach(book => {
+        if (book.quantity > 0) {
+          book.status = BookStatus.AVAILABLE;
+        } else {
+          book.status = BookStatus.UNAVAILABLE;
+        }
+      });
+
+      return books;
+    } catch (error) {
+      this.logger.error(`Failed to fetch books by author: ${error.message}`, error.stack);
+      throw error;
     }
   }
 }

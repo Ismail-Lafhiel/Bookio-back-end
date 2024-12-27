@@ -11,6 +11,7 @@ import {
   ScanCommand,
   UpdateCommand,
   DeleteCommand,
+  QueryCommand,
 } from '@aws-sdk/lib-dynamodb';
 
 @Injectable()
@@ -279,6 +280,68 @@ export class BooksService {
         this.logger.error(`Failed to borrow book: ${error.message}`, error.stack);
         throw new Error(`Failed to borrow book: ${error.message}`);
       }
+    }
+  }
+
+  async findByCategory(categoryId: string): Promise<Book[]> {
+    try {
+      const result = await this.dynamoDBService.documentClient.send(
+        new QueryCommand({
+          TableName: this.tableName,
+          IndexName: 'CategoryIndex',
+          KeyConditionExpression: 'categoryId = :categoryId',
+          ExpressionAttributeValues: {
+            ':categoryId': categoryId,
+          },
+        }),
+      );
+
+      const books = result.Items as Book[];
+
+      // Update status based on quantity
+      books.forEach(book => {
+        if (book.quantity > 0) {
+          book.status = BookStatus.AVAILABLE;
+        } else {
+          book.status = BookStatus.UNAVAILABLE;
+        }
+      });
+
+      return books;
+    } catch (error) {
+      this.logger.error(`Failed to fetch books by category: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  async findByAuthor(authorId: string): Promise<Book[]> {
+    try {
+      const result = await this.dynamoDBService.documentClient.send(
+        new QueryCommand({
+          TableName: this.tableName,
+          IndexName: 'AuthorIndex',
+          KeyConditionExpression: 'authorId = :authorId',
+          ExpressionAttributeValues: {
+            ':authorId': authorId,
+          },
+        }),
+      );
+
+      const books = result.Items as Book[];
+
+      // Update status based on quantity
+      books.forEach(book => {
+        if (book.quantity > 0) {
+          book.status = BookStatus.AVAILABLE;
+        } else {
+          book.status = BookStatus.UNAVAILABLE;
+        }
+      });
+
+      return books;
+    } catch (error) {
+      this.logger.error(`Failed to fetch books by author: ${error.message}`, error.stack);
+      throw error;
     }
   }
 }

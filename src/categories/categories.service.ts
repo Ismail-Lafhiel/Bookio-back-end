@@ -22,6 +22,7 @@ import {
   CategoryNotFoundByNameException,
 } from './exceptions/category.exceptions';
 import { ConditionalCheckFailedException } from '@aws-sdk/client-dynamodb';
+import { Book, BookStatus } from 'src/books/interfaces/book.interface';
 
 @Injectable()
 export class CategoriesService {
@@ -326,6 +327,37 @@ export class CategoriesService {
         );
       }
       throw new CategoryUpdateException(error.message);
+    }
+  }
+
+  async findBooksByCategory(categoryId: string): Promise<Book[]> {
+    try {
+      const result = await this.dynamoDBService.documentClient.send(
+        new QueryCommand({
+          TableName: 'Books',
+          IndexName: 'CategoryIndex',
+          KeyConditionExpression: 'categoryId = :categoryId',
+          ExpressionAttributeValues: {
+            ':categoryId': categoryId,
+          },
+        }),
+      );
+
+      const books = result.Items as Book[];
+
+      // Update status based on quantity
+      books.forEach(book => {
+        if (book.quantity > 0) {
+          book.status = BookStatus.AVAILABLE;
+        } else {
+          book.status = BookStatus.UNAVAILABLE;
+        }
+      });
+
+      return books;
+    } catch (error) {
+      this.logger.error(`Failed to fetch books by category: ${error.message}`, error.stack);
+      throw error;
     }
   }
 }

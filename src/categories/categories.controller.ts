@@ -12,12 +12,14 @@ import {
   HttpStatus,
   HttpCode,
   ValidationPipe,
+  ParseUUIDPipe,
 } from '@nestjs/common';
 import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CognitoAuthGuard } from '../auth/cognito.guard';
 import { Category } from './interfaces/category.interface';
+import { Book } from 'src/books/interfaces/book.interface';
 
 @Controller('categories')
 @UseGuards(CognitoAuthGuard)
@@ -99,6 +101,11 @@ export class CategoriesController {
       );
       throw error;
     }
+  }
+
+  @Get(':id/books')
+  async findBooksByCategory(@Param('id', ParseUUIDPipe) categoryId: string): Promise<Book[]> {
+    return this.categoriesService.findBooksByCategory(categoryId);
   }
 
   @Patch(':id')
