@@ -20,6 +20,7 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CognitoAuthGuard } from '../auth/cognito.guard';
 import { Category } from './interfaces/category.interface';
 import { Book } from 'src/books/interfaces/book.interface';
+import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @Controller('categories')
 export class CategoriesController {
@@ -51,20 +52,23 @@ export class CategoriesController {
   }
 
   @Get()
-  @HttpCode(HttpStatus.OK)
-  async findAll(): Promise<Category[]> {
-    this.logger.log('Fetching all categories');
-    try {
-      const categories = await this.categoriesService.findAll();
-      this.logger.log(`Found ${categories.length} categories`);
-      return categories;
-    } catch (error) {
-      this.logger.error(
-        `Failed to fetch categories: ${error.message}`,
-        error.stack,
-      );
-      throw error;
-    }
+  @ApiOperation({ summary: 'Get all categories' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns all categories or a message if none found',
+    schema: {
+      properties: {
+        message: { type: 'string' },
+        categories: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/Category' },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 500, description: 'Internal server error' })
+  async findAll(): Promise<{ message: string; categories: Category[] }> {
+    return this.categoriesService.findAll();
   }
 
   @Get('search')
@@ -105,7 +109,9 @@ export class CategoriesController {
 
   @Get(':id/books')
   @HttpCode(HttpStatus.OK)
-  async findBooksByCategory(@Param('id', ParseUUIDPipe) categoryId: string): Promise<Book[]> {
+  async findBooksByCategory(
+    @Param('id', ParseUUIDPipe) categoryId: string,
+  ): Promise<Book[]> {
     return this.categoriesService.findBooksByCategory(categoryId);
   }
 

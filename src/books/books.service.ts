@@ -3,6 +3,7 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { DynamoDBService } from '../dynamodb/dynamodb.service';
 import { S3Service } from '../s3/s3.service';
@@ -268,13 +269,15 @@ export class BooksService {
 
       const newQuantity = book.quantity - 1;
 
+      // Add status to the update expression
       const updateExpression =
-        'SET #borrowerId = :borrowerId, #quantity = :quantity, #startDate = :startDate, #returnDate = :returnDate, updatedAt = :updatedAt';
+        'SET #borrowerId = :borrowerId, #quantity = :quantity, #startDate = :startDate, #returnDate = :returnDate, #status = :status, updatedAt = :updatedAt';
       const expressionAttributeValues = {
         ':borrowerId': borrowData.borrowerId,
         ':quantity': newQuantity,
         ':startDate': borrowData.startDate,
         ':returnDate': borrowData.returnDate,
+        ':status': BookStatus.BORROWED, // Add status to the update
         ':updatedAt': new Date().toISOString(),
       };
       const expressionAttributeNames = {
@@ -282,6 +285,7 @@ export class BooksService {
         '#quantity': 'quantity',
         '#startDate': 'startDate',
         '#returnDate': 'returnDate',
+        '#status': 'status', // Add status to the names
       };
 
       const result = await this.dynamoDBService.documentClient.send(
@@ -296,10 +300,7 @@ export class BooksService {
         }),
       );
 
-      const updatedBook = result.Attributes as Book;
-      updatedBook.status = BookStatus.BORROWED;
-
-      return updatedBook;
+      return result.Attributes as Book;
     } catch (error) {
       if (error instanceof NotFoundException) {
         this.logger.error(`Book not found: ${error.message}`, error.stack);
@@ -382,6 +383,62 @@ export class BooksService {
         error.stack,
       );
       throw error;
+    }
+  }
+
+  async findBorrowedBooksByUser(
+    userId: string,
+  ): Promise<{ message: string; books: Book[] }> {
+    try {
+      console.log('Searching for books borrowed by user:', userId);
+
+      const params = {
+        TableName: this.tableName,
+        FilterExpression: '#borrowerId = :borrowerId AND #status = :status',
+        ExpressionAttributeNames: {
+          '#borrowerId': 'borrowerId',
+          '#status': 'status',
+        },
+        ExpressionAttributeValues: {
+          ':borrowerId': userId,
+          ':status': BookStatus.BORROWED,
+        },
+      };
+
+      console.log('Scan params:', JSON.stringify(params, null, 2));
+
+      const result = await this.dynamoDBService.documentClient.send(
+        new ScanCommand(params),
+      );
+
+      console.log('Scan result:', JSON.stringify(result, null, 2));
+
+      const books = result.Items as Book[];
+
+      if (!books || books.length === 0) {
+        return {
+          message: 'No borrowed books found',
+          books: [],
+        };
+      }
+
+      return {
+        message: `Found ${books.length} borrowed book(s)`,
+        books: books,
+      };
+    } catch (error) {
+      console.error('Full error details:', error);
+
+      this.logger.error('Failed to fetch borrowed books:', {
+        userId,
+        error: error.message,
+        stack: error.stack,
+        errorName: error.name,
+      });
+
+      throw new InternalServerErrorException(
+        `Failed to fetch borrowed books: ${error.message}`,
+      );
     }
   }
 }

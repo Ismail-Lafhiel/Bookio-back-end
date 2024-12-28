@@ -13,6 +13,7 @@ import {
   ValidationPipe,
   UseGuards,
   Request,
+  Query,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { BooksService } from './books.service';
@@ -21,6 +22,7 @@ import { UpdateBookDto } from './dto/update-book.dto';
 import { Book } from './interfaces/book.interface';
 import { CognitoAuthGuard } from 'src/auth/cognito.guard';
 import { BorrowBookDto } from './dto/borrow-book.dto';
+import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @Controller('books')
 export class BooksController {
@@ -164,10 +166,12 @@ export class BooksController {
     @Request() req,
   ): Promise<Book> {
     const borrowerId = req.user.sub;
-    return this.booksService.borrow(id, {
+    const result = await this.booksService.borrow(id, {
       ...borrowBookDto,
       borrowerId,
     });
+    console.log('Borrowed book result:', JSON.stringify(result, null, 2));
+    return result;
   }
 
   @Delete(':id')
@@ -176,5 +180,31 @@ export class BooksController {
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ message: string }> {
     return this.booksService.remove(id);
+  }
+
+  @Get('borrowed/me')
+  @UseGuards(CognitoAuthGuard)
+  @ApiOperation({ summary: 'Get all books borrowed by the authenticated user' })
+  @ApiResponse({
+    status: 200,
+    description: 'Returns all books borrowed by the user',
+    schema: {
+      properties: {
+        message: { type: 'string' },
+        books: {
+          type: 'array',
+          items: { $ref: '#/components/schemas/Book' },
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiBearerAuth()
+  async getMyBorrowedBooks(
+    @Request() req,
+  ): Promise<{ message: string; books: Book[] }> {
+    const userId = req.user.sub;
+    console.log('User ID from Cognito:', userId); // Debug log
+    return this.booksService.findBorrowedBooksByUser(userId);
   }
 }

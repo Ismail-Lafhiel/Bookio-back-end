@@ -56,8 +56,21 @@ export const BooksTableDefinition: CreateTableCommandInput = {
     { AttributeName: 'title', AttributeType: 'S' },
     { AttributeName: 'cover', AttributeType: 'S' },
     { AttributeName: 'pdf', AttributeType: 'S' },
+    { AttributeName: 'borrowerId', AttributeType: 'S' },
   ],
   GlobalSecondaryIndexes: [
+    {
+      IndexName: 'BorrowerStatusIndex',
+      KeySchema: [
+        { AttributeName: 'borrowerId', KeyType: 'HASH' },
+        { AttributeName: 'status', KeyType: 'RANGE' },
+      ],
+      Projection: { ProjectionType: 'ALL' },
+      ProvisionedThroughput: {
+        ReadCapacityUnits: 5,
+        WriteCapacityUnits: 5,
+      },
+    },
     {
       IndexName: 'AuthorIndex',
       KeySchema: [{ AttributeName: 'authorId', KeyType: 'HASH' }],

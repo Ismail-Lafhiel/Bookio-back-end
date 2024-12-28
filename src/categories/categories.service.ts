@@ -77,14 +77,26 @@ export class CategoriesService {
     }
   }
 
-  async findAll(): Promise<Category[]> {
+  async findAll(): Promise<{ message: string; categories: Category[] }> {
     try {
       const command = new ScanCommand({
         TableName: this.tableName,
       });
 
       const response = await this.dynamoDBService.documentClient.send(command);
-      return response.Items as Category[];
+      const categories = response.Items as Category[];
+
+      if (!categories || categories.length === 0) {
+        return {
+          message: 'No categories found',
+          categories: [],
+        };
+      }
+
+      return {
+        message: 'Categories retrieved successfully',
+        categories,
+      };
     } catch (error) {
       this.logger.error(
         `Failed to fetch categories: ${error.message}`,
@@ -346,7 +358,7 @@ export class CategoriesService {
       const books = result.Items as Book[];
 
       // Update status based on quantity
-      books.forEach(book => {
+      books.forEach((book) => {
         if (book.quantity > 0) {
           book.status = BookStatus.AVAILABLE;
         } else {
@@ -356,7 +368,10 @@ export class CategoriesService {
 
       return books;
     } catch (error) {
-      this.logger.error(`Failed to fetch books by category: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch books by category: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
