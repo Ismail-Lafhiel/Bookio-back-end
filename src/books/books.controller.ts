@@ -14,6 +14,7 @@ import {
   UseGuards,
   Request,
   Query,
+  InternalServerErrorException,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { BooksService } from './books.service';
@@ -160,18 +161,31 @@ export class BooksController {
 
   @Patch(':id/borrow')
   @UseGuards(CognitoAuthGuard)
+  @ApiOperation({ summary: 'Borrow a book' })
+  @ApiResponse({ status: 200, description: 'Book borrowed successfully' })
+  @ApiResponse({
+    status: 400,
+    description: 'Bad Request - Various validation errors',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   async borrow(
     @Param('id', ParseUUIDPipe) id: string,
     @Body() borrowBookDto: BorrowBookDto,
     @Request() req,
   ): Promise<Book> {
-    const borrowerId = req.user.sub;
-    const result = await this.booksService.borrow(id, {
-      ...borrowBookDto,
-      borrowerId,
-    });
-    console.log('Borrowed book result:', JSON.stringify(result, null, 2));
-    return result;
+    try {
+      const borrowerId = req.user.sub;
+      const result = await this.booksService.borrow(id, {
+        ...borrowBookDto,
+        borrowerId,
+      });
+      return result;
+    } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      throw new InternalServerErrorException('Failed to borrow book');
+    }
   }
 
   @Delete(':id')

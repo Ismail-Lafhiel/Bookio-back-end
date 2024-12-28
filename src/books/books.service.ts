@@ -248,6 +248,28 @@ export class BooksService {
     try {
       const book = await this.findOne(id);
 
+      // Check if the book is already borrowed by this user
+      const userBorrowedBooks = await this.findBorrowedBooksByUser(
+        borrowData.borrowerId,
+      );
+      const alreadyBorrowed = userBorrowedBooks.books.some(
+        (borrowedBook) => borrowedBook.id === id,
+      );
+
+      if (alreadyBorrowed) {
+        throw new BadRequestException(`You have already borrowed this book`);
+      }
+
+      // Get total number of books currently borrowed by the user
+      const totalBorrowedBooks = userBorrowedBooks.books.length;
+      const MAX_BORROWED_BOOKS = 3; // You can adjust this limit
+
+      if (totalBorrowedBooks >= MAX_BORROWED_BOOKS) {
+        throw new BadRequestException(
+          `You cannot borrow more than ${MAX_BORROWED_BOOKS} books at a time. Please return some books first.`,
+        );
+      }
+
       if (book.quantity <= 0) {
         throw new BadRequestException(
           `Book with ID "${id}" is not available for borrowing`,
@@ -267,25 +289,38 @@ export class BooksService {
         throw new BadRequestException('Return date must be after start date');
       }
 
+      // Maximum borrow duration (e.g., 30 days)
+      const MAX_BORROW_DAYS = 30;
+      const daysDifference = Math.ceil(
+        (returnDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24),
+      );
+
+      if (daysDifference > MAX_BORROW_DAYS) {
+        throw new BadRequestException(
+          `Maximum borrow duration is ${MAX_BORROW_DAYS} days`,
+        );
+      }
+
       const newQuantity = book.quantity - 1;
 
-      // Add status to the update expression
       const updateExpression =
         'SET #borrowerId = :borrowerId, #quantity = :quantity, #startDate = :startDate, #returnDate = :returnDate, #status = :status, updatedAt = :updatedAt';
+
       const expressionAttributeValues = {
         ':borrowerId': borrowData.borrowerId,
         ':quantity': newQuantity,
         ':startDate': borrowData.startDate,
         ':returnDate': borrowData.returnDate,
-        ':status': BookStatus.BORROWED, // Add status to the update
+        ':status': BookStatus.BORROWED,
         ':updatedAt': new Date().toISOString(),
       };
+
       const expressionAttributeNames = {
         '#borrowerId': 'borrowerId',
         '#quantity': 'quantity',
         '#startDate': 'startDate',
         '#returnDate': 'returnDate',
-        '#status': 'status', // Add status to the names
+        '#status': 'status',
       };
 
       const result = await this.dynamoDBService.documentClient.send(
@@ -300,7 +335,17 @@ export class BooksService {
         }),
       );
 
-      return result.Attributes as Book;
+      const updatedBook = result.Attributes as Book;
+
+      // Log the successful borrow operation
+      this.logger.log(`Book ${id} borrowed by user ${borrowData.borrowerId}`, {
+        bookId: id,
+        borrowerId: borrowData.borrowerId,
+        startDate: borrowData.startDate,
+        returnDate: borrowData.returnDate,
+      });
+
+      return updatedBook;
     } catch (error) {
       if (error instanceof NotFoundException) {
         this.logger.error(`Book not found: ${error.message}`, error.stack);
