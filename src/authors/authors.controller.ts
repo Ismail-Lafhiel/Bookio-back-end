@@ -54,12 +54,15 @@ export class AuthorsController {
 
   @Get()
   @HttpCode(HttpStatus.OK)
-  async findAll(): Promise<Author[]> {
+  async findAll(
+    @Query('limit') limit = 10,
+    @Query('lastEvaluatedKey') lastEvaluatedKey?: string,
+  ): Promise<{ authors: Author[]; lastEvaluatedKey?: string }> {
     this.logger.log('Fetching all authors');
     try {
-      const authors = await this.authorsService.findAll();
-      this.logger.log(`Found ${authors.length} authors`);
-      return authors;
+      const result = await this.authorsService.findAll(limit, lastEvaluatedKey);
+      this.logger.log(`Found ${result.authors.length} authors`);
+      return result;
     } catch (error) {
       this.logger.error(`Failed to fetch authors: ${error.message}`, error.stack);
       throw error;
@@ -68,12 +71,16 @@ export class AuthorsController {
 
   @Get('search')
   @HttpCode(HttpStatus.OK)
-  async findByName(@Query('name') name: string): Promise<Author[]> {
+  async findByName(
+    @Query('name') name: string,
+    @Query('limit') limit = 10,
+    @Query('lastEvaluatedKey') lastEvaluatedKey?: string,
+  ): Promise<{ authors: Author[]; lastEvaluatedKey?: string }> {
     this.logger.log(`Searching for author with name: ${name}`);
     try {
-      const authors = await this.authorsService.findByName(name);
-      this.logger.log(`Found ${authors.length} authors matching name: ${name}`);
-      return authors;
+      const result = await this.authorsService.findByName(name, limit, lastEvaluatedKey);
+      this.logger.log(`Found ${result.authors.length} authors matching name: ${name}`);
+      return result;
     } catch (error) {
       this.logger.error(`Failed to search authors by name: ${error.message}`, error.stack);
       throw error;

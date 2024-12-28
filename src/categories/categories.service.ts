@@ -36,15 +36,16 @@ export class CategoriesService {
       // Check for existing category with same name
       const existingCategories = await this.findByName(
         createCategoryDto.name,
+        1,
       ).catch((error) => {
         // If category not found, that's good - continue with creation
         if (error instanceof CategoryNotFoundByNameException) {
-          return [];
+          return { categories: [] };
         }
         throw error;
       });
 
-      if (existingCategories && existingCategories.length > 0) {
+      if (existingCategories && existingCategories.categories.length > 0) {
         throw new CategoryAlreadyExistsException(createCategoryDto.name);
       }
 
@@ -77,12 +78,18 @@ export class CategoriesService {
     }
   }
 
-  async findAll(): Promise<{ message: string; categories: Category[] }> {
+  async findAll(limit: number, lastEvaluatedKey?: string): Promise<{ message: string; categories: Category[]; lastEvaluatedKey?: string }> {
     try {
-      const command = new ScanCommand({
+      const params: any = {
         TableName: this.tableName,
-      });
+        Limit: limit,
+      };
 
+      if (lastEvaluatedKey) {
+        params.ExclusiveStartKey = { id: lastEvaluatedKey };
+      }
+
+      const command = new ScanCommand(params);
       const response = await this.dynamoDBService.documentClient.send(command);
       const categories = response.Items as Category[];
 
@@ -96,16 +103,11 @@ export class CategoriesService {
       return {
         message: 'Categories retrieved successfully',
         categories,
+        lastEvaluatedKey: response.LastEvaluatedKey ? response.LastEvaluatedKey.id : undefined,
       };
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch categories: ${error.message}`,
-        error.stack,
-      );
-      throw new HttpException(
-        'Failed to fetch categories',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      this.logger.error(`Failed to fetch categories: ${error.message}`, error.stack);
+      throw new HttpException('Failed to fetch categories', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -138,9 +140,9 @@ export class CategoriesService {
     }
   }
 
-  async findByName(name: string): Promise<Category[]> {
+  async findByName(name: string, limit: number, lastEvaluatedKey?: string): Promise<{ categories: Category[]; lastEvaluatedKey?: string }> {
     try {
-      const command = new QueryCommand({
+      const params: any = {
         TableName: this.tableName,
         IndexName: 'NameIndex',
         KeyConditionExpression: '#name = :name',
@@ -150,29 +152,31 @@ export class CategoriesService {
         ExpressionAttributeValues: {
           ':name': name,
         },
-      });
+        Limit: limit,
+      };
 
+      if (lastEvaluatedKey) {
+        params.ExclusiveStartKey = { id: lastEvaluatedKey };
+      }
+
+      const command = new QueryCommand(params);
       const response = await this.dynamoDBService.documentClient.send(command);
+      const categories = response.Items as Category[];
 
-      if (!response.Items || response.Items.length === 0) {
+      if (!categories || categories.length === 0) {
         throw new CategoryNotFoundByNameException(name);
       }
 
-      return response.Items as Category[];
+      return {
+        categories,
+        lastEvaluatedKey: response.LastEvaluatedKey ? response.LastEvaluatedKey.id : undefined,
+      };
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch categories by name ${name}: ${error.message}`,
-        error.stack,
-      );
-
+      this.logger.error(`Failed to fetch categories by name ${name}: ${error.message}`, error.stack);
       if (error instanceof CategoryNotFoundByNameException) {
         throw error;
       }
-
-      throw new HttpException(
-        'Failed to fetch categories by name',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
+      throw new HttpException('Failed to fetch categories by name', HttpStatus.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -188,18 +192,19 @@ export class CategoriesService {
       if (updateCategoryDto.name) {
         const existingCategories = await this.findByName(
           updateCategoryDto.name,
+          1,
         ).catch((error) => {
           // If category not found, that's good - continue with update
           if (error instanceof CategoryNotFoundByNameException) {
-            return [];
+            return { categories: [] };
           }
           throw error;
         });
 
         if (
           existingCategories &&
-          existingCategories.length > 0 &&
-          existingCategories[0].id !== id
+          existingCategories.categories.length > 0 &&
+          existingCategories.categories[0].id !== id
         ) {
           throw new CategoryAlreadyExistsException(updateCategoryDto.name);
         }

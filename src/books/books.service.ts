@@ -83,15 +83,20 @@ export class BooksService {
     }
   }
 
-  async findAll(): Promise<Book[]> {
+  async findAll(limit: number, lastEvaluatedKey?: string): Promise<{ books: Book[]; lastEvaluatedKey?: string }> {
     try {
-      const result = await this.dynamoDBService.documentClient.send(
-        new ScanCommand({
-          TableName: this.tableName,
-        }),
-      );
+      const params: any = {
+        TableName: this.tableName,
+        Limit: limit,
+      };
 
-      const books = result.Items as Book[];
+      if (lastEvaluatedKey) {
+        params.ExclusiveStartKey = { id: lastEvaluatedKey };
+      }
+
+      const command = new ScanCommand(params);
+      const response = await this.dynamoDBService.documentClient.send(command);
+      const books = response.Items as Book[];
 
       // Update status based on quantity
       books.forEach((book) => {
@@ -102,7 +107,10 @@ export class BooksService {
         }
       });
 
-      return books;
+      return {
+        books,
+        lastEvaluatedKey: response.LastEvaluatedKey ? response.LastEvaluatedKey.id : undefined,
+      };
     } catch (error) {
       this.logger.error(`Failed to fetch books: ${error.message}`, error.stack);
       throw error;
@@ -363,20 +371,25 @@ export class BooksService {
     }
   }
 
-  async findByCategory(categoryId: string): Promise<Book[]> {
+  async findByCategory(categoryId: string, limit: number, lastEvaluatedKey?: string): Promise<{ books: Book[]; lastEvaluatedKey?: string }> {
     try {
-      const result = await this.dynamoDBService.documentClient.send(
-        new QueryCommand({
-          TableName: this.tableName,
-          IndexName: 'CategoryIndex',
-          KeyConditionExpression: 'categoryId = :categoryId',
-          ExpressionAttributeValues: {
-            ':categoryId': categoryId,
-          },
-        }),
-      );
+      const params: any = {
+        TableName: this.tableName,
+        IndexName: 'CategoryIndex',
+        KeyConditionExpression: 'categoryId = :categoryId',
+        ExpressionAttributeValues: {
+          ':categoryId': categoryId,
+        },
+        Limit: limit,
+      };
 
-      const books = result.Items as Book[];
+      if (lastEvaluatedKey) {
+        params.ExclusiveStartKey = { id: lastEvaluatedKey };
+      }
+
+      const command = new QueryCommand(params);
+      const response = await this.dynamoDBService.documentClient.send(command);
+      const books = response.Items as Book[];
 
       // Update status based on quantity
       books.forEach((book) => {
@@ -387,12 +400,12 @@ export class BooksService {
         }
       });
 
-      return books;
+      return {
+        books,
+        lastEvaluatedKey: response.LastEvaluatedKey ? response.LastEvaluatedKey.id : undefined,
+      };
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch books by category: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Failed to fetch books by category: ${error.message}`, error.stack);
       throw error;
     }
   }

@@ -89,8 +89,11 @@ export class BooksController {
   }
 
   @Get()
-  async findAll(): Promise<Book[]> {
-    return this.booksService.findAll();
+  async findAll(
+    @Query('limit') limit = 10,
+    @Query('lastEvaluatedKey') lastEvaluatedKey?: string,
+  ): Promise<{ books: Book[]; lastEvaluatedKey?: string }> {
+    return this.booksService.findAll(limit, lastEvaluatedKey);
   }
 
   @Get(':id')
@@ -101,8 +104,10 @@ export class BooksController {
   @Get('category/:categoryId')
   async findByCategory(
     @Param('categoryId', ParseUUIDPipe) categoryId: string,
-  ): Promise<Book[]> {
-    return this.booksService.findByCategory(categoryId);
+    @Query('limit') limit = 10,
+    @Query('lastEvaluatedKey') lastEvaluatedKey?: string,
+  ): Promise<{ books: Book[]; lastEvaluatedKey?: string }> {
+    return this.booksService.findByCategory(categoryId, limit, lastEvaluatedKey);
   }
 
   @Get('author/:authorId')
@@ -227,13 +232,13 @@ export class BooksController {
     return this.booksService.findBorrowedBooksByUser(userId);
   }
 
-  @Get('debug/me')
-  @UseGuards(CognitoAuthGuard)
-  async getMyRole(@Request() req) {
-    return {
-      sub: req.user.sub,
-      groups: req.user.groups,
-      fullUser: req.user,
-    };
-  }
+  // @Get('debug/me')
+  // @UseGuards(CognitoAuthGuard)
+  // async getMyRole(@Request() req) {
+  //   return {
+  //     sub: req.user.sub,
+  //     groups: req.user.groups,
+  //     fullUser: req.user,
+  //   };
+  // }
 }

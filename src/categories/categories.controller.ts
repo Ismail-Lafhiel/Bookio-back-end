@@ -66,29 +66,32 @@ export class CategoriesController {
           type: 'array',
           items: { $ref: '#/components/schemas/Category' },
         },
+        lastEvaluatedKey: { type: 'string' },
       },
     },
   })
   @ApiResponse({ status: 500, description: 'Internal server error' })
-  async findAll(): Promise<{ message: string; categories: Category[] }> {
-    return this.categoriesService.findAll();
+  async findAll(
+    @Query('limit') limit = 10,
+    @Query('lastEvaluatedKey') lastEvaluatedKey?: string,
+  ): Promise<{ message: string; categories: Category[]; lastEvaluatedKey?: string }> {
+    return this.categoriesService.findAll(limit, lastEvaluatedKey);
   }
 
   @Get('search')
   @HttpCode(HttpStatus.OK)
-  async findByName(@Query('name') name: string): Promise<Category[]> {
+  async findByName(
+    @Query('name') name: string,
+    @Query('limit') limit = 10,
+    @Query('lastEvaluatedKey') lastEvaluatedKey?: string,
+  ): Promise<{ categories: Category[]; lastEvaluatedKey?: string }> {
     this.logger.log(`Searching for categories with name: ${name}`);
     try {
-      const categories = await this.categoriesService.findByName(name);
-      this.logger.log(
-        `Found ${categories.length} categories matching name: ${name}`,
-      );
-      return categories;
+      const result = await this.categoriesService.findByName(name, limit, lastEvaluatedKey);
+      this.logger.log(`Found ${result.categories.length} categories matching name: ${name}`);
+      return result;
     } catch (error) {
-      this.logger.error(
-        `Failed to search categories by name: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Failed to search categories by name: ${error.message}`, error.stack);
       throw error;
     }
   }

@@ -40,14 +40,16 @@ export class AuthorsService {
         throw new Error('Profile must be an image file');
       }
 
-      const existingAuthors = await this.findByName(createAuthorDto.name).catch(
+      const existingAuthorsResult = await this.findByName(createAuthorDto.name, 1).catch(
         (error) => {
           if (error instanceof AuthorNotFoundException) {
-            return [];
+            return { authors: [] };
           }
           throw error;
         },
       );
+
+      const existingAuthors = existingAuthorsResult.authors;
 
       if (existingAuthors && existingAuthors.length > 0) {
         throw new AuthorAlreadyExistsException(createAuthorDto.name);
@@ -88,19 +90,27 @@ export class AuthorsService {
     }
   }
 
-  async findAll(): Promise<Author[]> {
+  async findAll(limit: number, lastEvaluatedKey?: string): Promise<{ authors: Author[]; lastEvaluatedKey?: string }> {
     try {
-      const command = new ScanCommand({
+      const params: any = {
         TableName: this.tableName,
-      });
+        Limit: limit,
+      };
 
+      if (lastEvaluatedKey) {
+        params.ExclusiveStartKey = { id: lastEvaluatedKey };
+      }
+
+      const command = new ScanCommand(params);
       const response = await this.dynamoDBService.documentClient.send(command);
-      return response.Items as Author[];
+      const authors = response.Items as Author[];
+
+      return {
+        authors,
+        lastEvaluatedKey: response.LastEvaluatedKey ? response.LastEvaluatedKey.id : undefined,
+      };
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch authors: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Failed to fetch authors: ${error.message}`, error.stack);
       throw new AuthorCreateException(error.message);
     }
   }
@@ -131,9 +141,9 @@ export class AuthorsService {
     }
   }
 
-  async findByName(name: string): Promise<Author[]> {
+  async findByName(name: string, limit: number, lastEvaluatedKey?: string): Promise<{ authors: Author[]; lastEvaluatedKey?: string }> {
     try {
-      const command = new QueryCommand({
+      const params: any = {
         TableName: this.tableName,
         IndexName: 'NameIndex',
         KeyConditionExpression: '#name = :name',
@@ -143,22 +153,27 @@ export class AuthorsService {
         ExpressionAttributeValues: {
           ':name': name,
         },
-      });
+        Limit: limit,
+      };
 
-      const response = await this.dynamoDBService.documentClient.send(command);
-
-      if (!response.Items || response.Items.length === 0) {
-        throw new AuthorNotFoundException(
-          `Author with name "${name}" does not exist`,
-        );
+      if (lastEvaluatedKey) {
+        params.ExclusiveStartKey = { id: lastEvaluatedKey };
       }
 
-      return response.Items as Author[];
+      const command = new QueryCommand(params);
+      const response = await this.dynamoDBService.documentClient.send(command);
+      const authors = response.Items as Author[];
+
+      if (!authors || authors.length === 0) {
+        throw new AuthorNotFoundException(`Author with name "${name}" does not exist`);
+      }
+
+      return {
+        authors,
+        lastEvaluatedKey: response.LastEvaluatedKey ? response.LastEvaluatedKey.id : undefined,
+      };
     } catch (error) {
-      this.logger.error(
-        `Failed to fetch authors by name ${name}: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`Failed to fetch authors by name ${name}: ${error.message}`, error.stack);
       if (error instanceof AuthorNotFoundException) {
         throw error;
       }
@@ -181,14 +196,17 @@ export class AuthorsService {
         updateAuthorDto.name &&
         updateAuthorDto.name !== existingAuthor.name
       ) {
-        const existingAuthors = await this.findByName(
+        const existingAuthorsResult = await this.findByName(
           updateAuthorDto.name,
+          1,
         ).catch((error) => {
           if (error instanceof AuthorNotFoundException) {
-            return [];
+            return { authors: [] };
           }
           throw error;
         });
+
+        const existingAuthors = existingAuthorsResult.authors;
 
         if (existingAuthors && existingAuthors.length > 0) {
           throw new AuthorAlreadyExistsException(updateAuthorDto.name);
