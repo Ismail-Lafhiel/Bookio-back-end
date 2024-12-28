@@ -25,8 +25,18 @@ export class CognitoAuthGuard implements CanActivate {
       throw new UnauthorizedException('Invalid token');
     }
 
-    // Add user info to request object
-    request.user = payload;
+    // Add user info to request object with groups
+    request.user = {
+      ...payload,
+      groups: payload['cognito:groups'] || ['USER'], // Get the groups from token
+    };
+    
+    console.log('User payload:', {
+      sub: payload.sub,
+      groups: payload['cognito:groups'],
+      fullPayload: payload
+    });
+
     return true;
   }
 }

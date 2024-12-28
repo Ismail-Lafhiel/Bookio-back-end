@@ -21,6 +21,8 @@ import { CognitoAuthGuard } from '../auth/cognito.guard';
 import { Category } from './interfaces/category.interface';
 import { Book } from 'src/books/interfaces/book.interface';
 import { ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Roles, UserRole } from 'src/auth/decorators/roles.decorator';
+import { RolesGuard } from 'src/auth/roles.guard';
 
 @Controller('categories')
 export class CategoriesController {
@@ -29,7 +31,8 @@ export class CategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Post()
-  @UseGuards(CognitoAuthGuard)
+  @UseGuards(CognitoAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.CREATED)
   async create(
     @Body(new ValidationPipe({ transform: true }))
@@ -116,7 +119,8 @@ export class CategoriesController {
   }
 
   @Patch(':id')
-  @UseGuards(CognitoAuthGuard)
+  @UseGuards(CognitoAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async update(
     @Param('id') id: string,
@@ -141,7 +145,8 @@ export class CategoriesController {
   }
 
   @Delete(':id')
-  @UseGuards(CognitoAuthGuard)
+  @UseGuards(CognitoAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string): Promise<{ message: string }> {
     this.logger.log(`Deleting category with ID: ${id}`);

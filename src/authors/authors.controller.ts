@@ -23,6 +23,8 @@ import { UpdateAuthorDto } from './dto/update-author.dto';
 import { CognitoAuthGuard } from '../auth/cognito.guard';
 import { Author } from './interfaces/author.interface';
 import { Book } from 'src/books/interfaces/book.interface';
+import { Roles, UserRole } from 'src/auth/decorators/roles.decorator';
+import { RolesGuard } from 'src/auth/roles.guard';
 
 @Controller('authors')
 export class AuthorsController {
@@ -31,7 +33,8 @@ export class AuthorsController {
   constructor(private readonly authorsService: AuthorsService) {}
 
   @Post()
-  @UseGuards(CognitoAuthGuard)
+  @UseGuards(CognitoAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor('profilePicture'))
   async create(
@@ -98,7 +101,8 @@ export class AuthorsController {
   }
 
   @Patch(':id')
-  @UseGuards(CognitoAuthGuard)
+  @UseGuards(CognitoAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   @UseInterceptors(FileInterceptor('profilePicture'))
   async update(
@@ -118,7 +122,8 @@ export class AuthorsController {
   }
 
   @Delete(':id')
-  @UseGuards(CognitoAuthGuard)
+  @UseGuards(CognitoAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @HttpCode(HttpStatus.OK)
   async remove(@Param('id') id: string): Promise<{ message: string }> {
     this.logger.log(`Deleting author with ID: ${id}`);

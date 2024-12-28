@@ -24,13 +24,16 @@ import { Book } from './interfaces/book.interface';
 import { CognitoAuthGuard } from 'src/auth/cognito.guard';
 import { BorrowBookDto } from './dto/borrow-book.dto';
 import { ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Roles, UserRole } from 'src/auth/decorators/roles.decorator';
+import { RolesGuard } from 'src/auth/roles.guard';
 
 @Controller('books')
 export class BooksController {
   constructor(private readonly booksService: BooksService) {}
 
   @Post()
-  @UseGuards(CognitoAuthGuard)
+  @UseGuards(CognitoAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @UseInterceptors(
     FileFieldsInterceptor(
       [
@@ -110,7 +113,8 @@ export class BooksController {
   }
 
   @Patch(':id')
-  @UseGuards(CognitoAuthGuard)
+  @UseGuards(CognitoAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   @UseInterceptors(
     FileFieldsInterceptor(
       [
@@ -189,7 +193,8 @@ export class BooksController {
   }
 
   @Delete(':id')
-  @UseGuards(CognitoAuthGuard)
+  @UseGuards(CognitoAuthGuard, RolesGuard)
+  @Roles(UserRole.ADMIN)
   async remove(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<{ message: string }> {
@@ -220,5 +225,15 @@ export class BooksController {
     const userId = req.user.sub;
     console.log('User ID from Cognito:', userId); // Debug log
     return this.booksService.findBorrowedBooksByUser(userId);
+  }
+
+  @Get('debug/me')
+  @UseGuards(CognitoAuthGuard)
+  async getMyRole(@Request() req) {
+    return {
+      sub: req.user.sub,
+      groups: req.user.groups,
+      fullUser: req.user,
+    };
   }
 }
