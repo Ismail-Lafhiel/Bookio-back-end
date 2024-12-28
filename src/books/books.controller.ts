@@ -20,6 +20,7 @@ import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { Book } from './interfaces/book.interface';
 import { CognitoAuthGuard } from 'src/auth/cognito.guard';
+import { BorrowBookDto } from './dto/borrow-book.dto';
 
 @Controller('books')
 export class BooksController {
@@ -92,12 +93,16 @@ export class BooksController {
   }
 
   @Get('category/:categoryId')
-  async findByCategory(@Param('categoryId', ParseUUIDPipe) categoryId: string): Promise<Book[]> {
+  async findByCategory(
+    @Param('categoryId', ParseUUIDPipe) categoryId: string,
+  ): Promise<Book[]> {
     return this.booksService.findByCategory(categoryId);
   }
 
   @Get('author/:authorId')
-  async findByAuthor(@Param('authorId', ParseUUIDPipe) authorId: string): Promise<Book[]> {
+  async findByAuthor(
+    @Param('authorId', ParseUUIDPipe) authorId: string,
+  ): Promise<Book[]> {
     return this.booksService.findByAuthor(authorId);
   }
 
@@ -155,15 +160,21 @@ export class BooksController {
   @UseGuards(CognitoAuthGuard)
   async borrow(
     @Param('id', ParseUUIDPipe) id: string,
+    @Body() borrowBookDto: BorrowBookDto,
     @Request() req,
   ): Promise<Book> {
     const borrowerId = req.user.sub;
-    return this.booksService.borrow(id, borrowerId);
+    return this.booksService.borrow(id, {
+      ...borrowBookDto,
+      borrowerId,
+    });
   }
 
   @Delete(':id')
   @UseGuards(CognitoAuthGuard)
-  async remove(@Param('id', ParseUUIDPipe) id: string): Promise<{ message: string }> {
+  async remove(
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<{ message: string }> {
     return this.booksService.remove(id);
   }
 }

@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { DynamoDBService } from '../dynamodb/dynamodb.service';
 import { S3Service } from '../s3/s3.service';
 import { CreateBookDto } from './dto/create-book.dto';
@@ -15,6 +20,7 @@ import {
 } from '@aws-sdk/lib-dynamodb';
 import { CategoriesService } from '../categories/categories.service';
 import { AuthorsService } from '../authors/authors.service';
+import { BorrowBookDto } from './dto/borrow-book.dto';
 
 @Injectable()
 export class BooksService {
@@ -87,7 +93,7 @@ export class BooksService {
       const books = result.Items as Book[];
 
       // Update status based on quantity
-      books.forEach(book => {
+      books.forEach((book) => {
         if (book.quantity > 0) {
           book.status = BookStatus.AVAILABLE;
         } else {
@@ -178,7 +184,10 @@ export class BooksService {
 
       // Handle other fields
       Object.entries(updateBookDto).forEach(([key, value]) => {
-        if (value !== undefined && !['id', 'createdAt', 'updatedAt'].includes(key)) {
+        if (
+          value !== undefined &&
+          !['id', 'createdAt', 'updatedAt'].includes(key)
+        ) {
           updateExpression += `, #${key} = :${key}`;
           expressionAttributeValues[`:${key}`] = value;
           expressionAttributeNames[`#${key}`] = key;
@@ -231,27 +240,41 @@ export class BooksService {
     }
   }
 
-  async borrow(id: string, borrowerId: string): Promise<Book> {
+  async borrow(
+    id: string,
+    borrowData: { borrowerId: string; startDate: string; returnDate: string },
+  ): Promise<Book> {
     try {
       const book = await this.findOne(id);
 
       if (book.quantity <= 0) {
-        throw new BadRequestException(`Book with ID "${id}" is not available for borrowing`);
+        throw new BadRequestException(
+          `Book with ID "${id}" is not available for borrowing`,
+        );
       }
 
-      const startDate = new Date().toISOString();
-      const returnDate = new Date();
-      returnDate.setDate(returnDate.getDate() + 14); // Assuming a 2-week borrowing period
-      const returnDateString = returnDate.toISOString();
+      // Validate dates
+      const currentDate = new Date();
+      const startDate = new Date(borrowData.startDate);
+      const returnDate = new Date(borrowData.returnDate);
+
+      if (startDate < currentDate) {
+        throw new BadRequestException('Start date cannot be in the past');
+      }
+
+      if (returnDate <= startDate) {
+        throw new BadRequestException('Return date must be after start date');
+      }
 
       const newQuantity = book.quantity - 1;
 
-      const updateExpression = 'SET #borrowerId = :borrowerId, #quantity = :quantity, #startDate = :startDate, #returnDate = :returnDate, updatedAt = :updatedAt';
+      const updateExpression =
+        'SET #borrowerId = :borrowerId, #quantity = :quantity, #startDate = :startDate, #returnDate = :returnDate, updatedAt = :updatedAt';
       const expressionAttributeValues = {
-        ':borrowerId': borrowerId,
+        ':borrowerId': borrowData.borrowerId,
         ':quantity': newQuantity,
-        ':startDate': startDate,
-        ':returnDate': returnDateString,
+        ':startDate': borrowData.startDate,
+        ':returnDate': borrowData.returnDate,
         ':updatedAt': new Date().toISOString(),
       };
       const expressionAttributeNames = {
@@ -285,7 +308,10 @@ export class BooksService {
         this.logger.error(`Book not available: ${error.message}`, error.stack);
         throw error;
       } else {
-        this.logger.error(`Failed to borrow book: ${error.message}`, error.stack);
+        this.logger.error(
+          `Failed to borrow book: ${error.message}`,
+          error.stack,
+        );
         throw new Error(`Failed to borrow book: ${error.message}`);
       }
     }
@@ -307,7 +333,7 @@ export class BooksService {
       const books = result.Items as Book[];
 
       // Update status based on quantity
-      books.forEach(book => {
+      books.forEach((book) => {
         if (book.quantity > 0) {
           book.status = BookStatus.AVAILABLE;
         } else {
@@ -317,7 +343,10 @@ export class BooksService {
 
       return books;
     } catch (error) {
-      this.logger.error(`Failed to fetch books by category: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch books by category: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -338,7 +367,7 @@ export class BooksService {
       const books = result.Items as Book[];
 
       // Update status based on quantity
-      books.forEach(book => {
+      books.forEach((book) => {
         if (book.quantity > 0) {
           book.status = BookStatus.AVAILABLE;
         } else {
@@ -348,7 +377,10 @@ export class BooksService {
 
       return books;
     } catch (error) {
-      this.logger.error(`Failed to fetch books by author: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch books by author: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
