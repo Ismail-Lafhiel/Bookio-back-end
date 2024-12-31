@@ -41,4 +41,17 @@ export class CreateBookDto {
   @IsNotEmpty()
   @Transform(({ value }) => parseInt(value, 10))
   quantity: number;
+
+  @IsString()
+  @IsOptional()
+  cover?: string;
+
+  @IsString()
+  @IsOptional()
+  pdf?: string;
+
+  @IsInt()
+  @IsOptional()
+  @Transform(({ value }) => parseInt(value, 10))
+  rating?: number;
 }

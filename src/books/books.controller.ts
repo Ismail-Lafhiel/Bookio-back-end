@@ -92,7 +92,7 @@ export class BooksController {
   async findAll(
     @Query('limit') limit = 10,
     @Query('lastEvaluatedKey') lastEvaluatedKey?: string,
-  ): Promise<{ books: Book[]; lastEvaluatedKey?: string }> {
+  ): Promise<{ message: string; books: Book[]; lastEvaluatedKey?: string }> {
     return this.booksService.findAll(limit, lastEvaluatedKey);
   }
 
@@ -106,14 +106,14 @@ export class BooksController {
     @Param('categoryId', ParseUUIDPipe) categoryId: string,
     @Query('limit') limit = 10,
     @Query('lastEvaluatedKey') lastEvaluatedKey?: string,
-  ): Promise<{ books: Book[]; lastEvaluatedKey?: string }> {
+  ): Promise<{ message: string; books: Book[]; lastEvaluatedKey?: string }> {
     return this.booksService.findByCategory(categoryId, limit, lastEvaluatedKey);
   }
 
   @Get('author/:authorId')
   async findByAuthor(
     @Param('authorId', ParseUUIDPipe) authorId: string,
-  ): Promise<Book[]> {
+  ): Promise<{ message: string; books: Book[] }> {
     return this.booksService.findByAuthor(authorId);
   }
 

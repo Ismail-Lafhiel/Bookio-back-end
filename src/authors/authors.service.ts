@@ -22,7 +22,6 @@ import {
 } from './exceptions/author.exceptions';
 import { S3Service } from '../s3/s3.service';
 import { Book, BookStatus } from 'src/books/interfaces/book.interface';
-
 @Injectable()
 export class AuthorsService {
   private readonly tableName = 'Authors';
@@ -33,21 +32,25 @@ export class AuthorsService {
     private readonly s3Service: S3Service,
   ) {}
 
-  async create(createAuthorDto: CreateAuthorDto, profilePicture?: Express.Multer.File): Promise<Author> {
+  async create(
+    createAuthorDto: CreateAuthorDto,
+    profilePicture?: Express.Multer.File,
+  ): Promise<Author> {
     try {
       // Validate profile field to only accept images
       if (profilePicture && !profilePicture.mimetype.startsWith('image/')) {
         throw new Error('Profile must be an image file');
       }
 
-      const existingAuthorsResult = await this.findByName(createAuthorDto.name, 1).catch(
-        (error) => {
-          if (error instanceof AuthorNotFoundException) {
-            return { authors: [] };
-          }
-          throw error;
-        },
-      );
+      const existingAuthorsResult = await this.findByName(
+        createAuthorDto.name,
+        1,
+      ).catch((error) => {
+        if (error instanceof AuthorNotFoundException) {
+          return { authors: [] };
+        }
+        throw error;
+      });
 
       const existingAuthors = existingAuthorsResult.authors;
 
@@ -57,7 +60,10 @@ export class AuthorsService {
 
       let profileUrl: string | undefined;
       if (profilePicture) {
-        profileUrl = await this.s3Service.uploadFile(profilePicture, 'authors/profiles');
+        profileUrl = await this.s3Service.uploadFile(
+          profilePicture,
+          'authors/profiles',
+        );
       }
 
       const author: Author = {
@@ -90,7 +96,14 @@ export class AuthorsService {
     }
   }
 
-  async findAll(limit: number, lastEvaluatedKey?: string): Promise<{ authors: Author[]; lastEvaluatedKey?: string }> {
+  async findAll(
+    limit: number,
+    lastEvaluatedKey?: string,
+  ): Promise<{
+    message: string;
+    authors: Author[];
+    lastEvaluatedKey?: string;
+  }> {
     try {
       const params: any = {
         TableName: this.tableName,
@@ -106,16 +119,22 @@ export class AuthorsService {
       const authors = response.Items as Author[];
 
       return {
+        message: 'Authors retrieved successfully',
         authors,
-        lastEvaluatedKey: response.LastEvaluatedKey ? response.LastEvaluatedKey.id : undefined,
+        lastEvaluatedKey: response.LastEvaluatedKey
+          ? response.LastEvaluatedKey.id
+          : undefined,
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch authors: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch authors: ${error.message}`,
+        error.stack,
+      );
       throw new AuthorCreateException(error.message);
     }
   }
 
-  async findOne(id: string): Promise<Author> {
+  async findOne(id: string): Promise<{ message: string; author: Author }> {
     try {
       const command = new GetCommand({
         TableName: this.tableName,
@@ -128,7 +147,12 @@ export class AuthorsService {
         throw new AuthorNotFoundException(id);
       }
 
-      return response.Item as Author;
+      const author = response.Item as Author;
+
+      return {
+        message: 'Author retrieved successfully',
+        author,
+      };
     } catch (error) {
       this.logger.error(
         `Failed to fetch author ${id}: ${error.message}`,
@@ -141,7 +165,15 @@ export class AuthorsService {
     }
   }
 
-  async findByName(name: string, limit: number, lastEvaluatedKey?: string): Promise<{ authors: Author[]; lastEvaluatedKey?: string }> {
+  async findByName(
+    name: string,
+    limit: number,
+    lastEvaluatedKey?: string,
+  ): Promise<{
+    message: string;
+    authors: Author[];
+    lastEvaluatedKey?: string;
+  }> {
     try {
       const params: any = {
         TableName: this.tableName,
@@ -165,15 +197,23 @@ export class AuthorsService {
       const authors = response.Items as Author[];
 
       if (!authors || authors.length === 0) {
-        throw new AuthorNotFoundException(`Author with name "${name}" does not exist`);
+        throw new AuthorNotFoundException(
+          `Author with name "${name}" does not exist`,
+        );
       }
 
       return {
+        message: 'Authors retrieved successfully',
         authors,
-        lastEvaluatedKey: response.LastEvaluatedKey ? response.LastEvaluatedKey.id : undefined,
+        lastEvaluatedKey: response.LastEvaluatedKey
+          ? response.LastEvaluatedKey.id
+          : undefined,
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch authors by name ${name}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch authors by name ${name}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof AuthorNotFoundException) {
         throw error;
       }
@@ -181,7 +221,11 @@ export class AuthorsService {
     }
   }
 
-  async update(id: string, updateAuthorDto: UpdateAuthorDto, profilePicture?: Express.Multer.File): Promise<Author> {
+  async update(
+    id: string,
+    updateAuthorDto: UpdateAuthorDto,
+    profilePicture?: Express.Multer.File,
+  ): Promise<{ message: string; author: Author }> {
     try {
       // Validate profile field to only accept images
       if (profilePicture && !profilePicture.mimetype.startsWith('image/')) {
@@ -189,7 +233,8 @@ export class AuthorsService {
       }
 
       // Check if author exists
-      const existingAuthor = await this.findOne(id);
+      const existingAuthorResponse = await this.findOne(id);
+      const existingAuthor = existingAuthorResponse.author;
 
       // If name is being updated, check for duplicates
       if (
@@ -215,7 +260,10 @@ export class AuthorsService {
 
       let profileUrl: string | undefined;
       if (profilePicture) {
-        profileUrl = await this.s3Service.uploadFile(profilePicture, 'authors/profiles');
+        profileUrl = await this.s3Service.uploadFile(
+          profilePicture,
+          'authors/profiles',
+        );
       }
 
       const updateExpression: string[] = [];
@@ -251,7 +299,10 @@ export class AuthorsService {
 
       const response = await this.dynamoDBService.documentClient.send(command);
       this.logger.log(`Updated author with ID: ${id}`);
-      return response.Attributes as Author;
+      return {
+        message: 'Author updated successfully',
+        author: response.Attributes as Author,
+      };
     } catch (error) {
       this.logger.error(
         `Failed to update author ${id}: ${error.message}`,
@@ -269,7 +320,8 @@ export class AuthorsService {
 
   async remove(id: string): Promise<{ message: string }> {
     try {
-      const author = await this.findOne(id);
+      const existingAuthorResponse = await this.findOne(id);
+      const author = existingAuthorResponse.author;
 
       if (author.booksCount > 0) {
         throw new AuthorDeleteException(
@@ -359,7 +411,9 @@ export class AuthorsService {
     }
   }
 
-  async findBooksByAuthor(authorId: string): Promise<Book[]> {
+  async findBooksByAuthor(
+    authorId: string,
+  ): Promise<{ message: string; books: Book[] }> {
     try {
       const result = await this.dynamoDBService.documentClient.send(
         new QueryCommand({
@@ -375,7 +429,7 @@ export class AuthorsService {
       const books = result.Items as Book[];
 
       // Update status based on quantity
-      books.forEach(book => {
+      books.forEach((book) => {
         if (book.quantity > 0) {
           book.status = BookStatus.AVAILABLE;
         } else {
@@ -383,9 +437,15 @@ export class AuthorsService {
         }
       });
 
-      return books;
+      return {
+        message: 'Books retrieved successfully',
+        books,
+      };
     } catch (error) {
-      this.logger.error(`Failed to fetch books by author: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch books by author: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }

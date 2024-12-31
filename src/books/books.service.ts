@@ -83,7 +83,10 @@ export class BooksService {
     }
   }
 
-  async findAll(limit: number, lastEvaluatedKey?: string): Promise<{ books: Book[]; lastEvaluatedKey?: string }> {
+  async findAll(
+    limit: number,
+    lastEvaluatedKey?: string,
+  ): Promise<{ message: string; books: Book[]; lastEvaluatedKey?: string }> {
     try {
       const params: any = {
         TableName: this.tableName,
@@ -108,12 +111,15 @@ export class BooksService {
       });
 
       return {
+        message: 'Books retrieved successfully',
         books,
-        lastEvaluatedKey: response.LastEvaluatedKey ? response.LastEvaluatedKey.id : undefined,
+        lastEvaluatedKey: response.LastEvaluatedKey
+          ? response.LastEvaluatedKey.id
+          : undefined,
       };
     } catch (error) {
       this.logger.error(`Failed to fetch books: ${error.message}`, error.stack);
-      throw error;
+      throw new InternalServerErrorException('Failed to fetch books');
     }
   }
 
@@ -142,7 +148,7 @@ export class BooksService {
       return book;
     } catch (error) {
       this.logger.error(`Failed to fetch book: ${error.message}`, error.stack);
-      throw error;
+      throw new InternalServerErrorException('Failed to fetch book');
     }
   }
 
@@ -152,7 +158,8 @@ export class BooksService {
     files: { cover?: Express.Multer.File[]; pdf?: Express.Multer.File[] },
   ): Promise<Book> {
     try {
-      const existingBook = await this.findOne(id);
+      const existingBookResponse = await this.findOne(id);
+      const existingBook = existingBookResponse;
 
       let updateExpression = 'SET updatedAt = :updatedAt';
       const expressionAttributeValues: any = {
@@ -371,7 +378,11 @@ export class BooksService {
     }
   }
 
-  async findByCategory(categoryId: string, limit: number, lastEvaluatedKey?: string): Promise<{ books: Book[]; lastEvaluatedKey?: string }> {
+  async findByCategory(
+    categoryId: string,
+    limit: number,
+    lastEvaluatedKey?: string,
+  ): Promise<{ message: string; books: Book[]; lastEvaluatedKey?: string }> {
     try {
       const params: any = {
         TableName: this.tableName,
@@ -401,16 +412,26 @@ export class BooksService {
       });
 
       return {
+        message: 'Books retrieved successfully',
         books,
-        lastEvaluatedKey: response.LastEvaluatedKey ? response.LastEvaluatedKey.id : undefined,
+        lastEvaluatedKey: response.LastEvaluatedKey
+          ? response.LastEvaluatedKey.id
+          : undefined,
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch books by category: ${error.message}`, error.stack);
-      throw error;
+      this.logger.error(
+        `Failed to fetch books by category: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        'Failed to fetch books by category',
+      );
     }
   }
 
-  async findByAuthor(authorId: string): Promise<Book[]> {
+  async findByAuthor(
+    authorId: string,
+  ): Promise<{ message: string; books: Book[] }> {
     try {
       const result = await this.dynamoDBService.documentClient.send(
         new QueryCommand({
@@ -434,13 +455,16 @@ export class BooksService {
         }
       });
 
-      return books;
+      return {
+        message: 'Books retrieved successfully',
+        books,
+      };
     } catch (error) {
       this.logger.error(
         `Failed to fetch books by author: ${error.message}`,
         error.stack,
       );
-      throw error;
+      throw new InternalServerErrorException('Failed to fetch books by author');
     }
   }
 

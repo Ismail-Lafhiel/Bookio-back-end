@@ -5,7 +5,11 @@ export interface Author {
   birthDate: string;
   nationality: string;
   email: string;
-  socialMedia?: string[];
+  socialMedia?: {
+    facebook?: string;
+    twitter?: string;
+    website?: string;
+  };
   genres: string[];
   booksCount: number;
   profile?: string;

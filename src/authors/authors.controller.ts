@@ -57,7 +57,7 @@ export class AuthorsController {
   async findAll(
     @Query('limit') limit = 10,
     @Query('lastEvaluatedKey') lastEvaluatedKey?: string,
-  ): Promise<{ authors: Author[]; lastEvaluatedKey?: string }> {
+  ): Promise<{ message: string; authors: Author[]; lastEvaluatedKey?: string }> {
     this.logger.log('Fetching all authors');
     try {
       const result = await this.authorsService.findAll(limit, lastEvaluatedKey);
@@ -75,7 +75,7 @@ export class AuthorsController {
     @Query('name') name: string,
     @Query('limit') limit = 10,
     @Query('lastEvaluatedKey') lastEvaluatedKey?: string,
-  ): Promise<{ authors: Author[]; lastEvaluatedKey?: string }> {
+  ): Promise<{ message: string; authors: Author[]; lastEvaluatedKey?: string }> {
     this.logger.log(`Searching for author with name: ${name}`);
     try {
       const result = await this.authorsService.findByName(name, limit, lastEvaluatedKey);
@@ -89,12 +89,12 @@ export class AuthorsController {
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  async findOne(@Param('id') id: string): Promise<Author> {
+  async findOne(@Param('id') id: string): Promise<{ message: string; author: Author }> {
     this.logger.log(`Fetching author with ID: ${id}`);
     try {
-      const author = await this.authorsService.findOne(id);
-      this.logger.log(`Found author: ${author.name}`);
-      return author;
+      const result = await this.authorsService.findOne(id);
+      this.logger.log(`Found author: ${result.author.name}`);
+      return result;
     } catch (error) {
       this.logger.error(`Failed to fetch author: ${error.message}`, error.stack);
       throw error;
@@ -103,7 +103,7 @@ export class AuthorsController {
 
   @Get(':id/books')
   @HttpCode(HttpStatus.OK)
-  async findBooksByAuthor(@Param('id', ParseUUIDPipe) authorId: string): Promise<Book[]> {
+  async findBooksByAuthor(@Param('id', ParseUUIDPipe) authorId: string): Promise<{ message: string; books: Book[] }> {
     return this.authorsService.findBooksByAuthor(authorId);
   }
 
@@ -116,12 +116,12 @@ export class AuthorsController {
     @Param('id') id: string,
     @Body(new ValidationPipe({ transform: true })) updateAuthorDto: UpdateAuthorDto,
     @UploadedFile() profilePicture: Express.Multer.File,
-  ): Promise<Author> {
+  ): Promise<{ message: string; author: Author }> {
     this.logger.log(`Updating author with ID: ${id}`);
     try {
-      const author = await this.authorsService.update(id, updateAuthorDto, profilePicture);
+      const result = await this.authorsService.update(id, updateAuthorDto, profilePicture);
       this.logger.log(`Author ${id} updated successfully`);
-      return author;
+      return result;
     } catch (error) {
       this.logger.error(`Failed to update author: ${error.message}`, error.stack);
       throw error;

@@ -16,6 +16,15 @@ export class DynamoDBService {
       },
     });
 
-    this.documentClient = DynamoDBDocumentClient.from(this.ddbClient);
+    this.documentClient = DynamoDBDocumentClient.from(this.ddbClient, {
+      marshallOptions: {
+        // Convert empty strings, blobs, and sets to null
+        convertEmptyValues: true,
+        // Remove undefined values
+        removeUndefinedValues: true,
+        // Convert typeof object to map attribute
+        convertClassInstanceToMap: true,
+      },
+    });
   }
 }

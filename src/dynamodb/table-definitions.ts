@@ -6,13 +6,23 @@ export const AuthorsTableDefinition: CreateTableCommandInput = {
   AttributeDefinitions: [
     { AttributeName: 'id', AttributeType: 'S' },
     { AttributeName: 'name', AttributeType: 'S' },
-    { AttributeName: 'nationality', AttributeType: 'S' },
     { AttributeName: 'email', AttributeType: 'S' },
+    { AttributeName: 'nationality', AttributeType: 'S' },
+    { AttributeName: 'createdAt', AttributeType: 'S' },
   ],
   GlobalSecondaryIndexes: [
     {
       IndexName: 'NameIndex',
       KeySchema: [{ AttributeName: 'name', KeyType: 'HASH' }],
+      Projection: { ProjectionType: 'ALL' },
+      ProvisionedThroughput: {
+        ReadCapacityUnits: 5,
+        WriteCapacityUnits: 5,
+      },
+    },
+    {
+      IndexName: 'EmailIndex',
+      KeySchema: [{ AttributeName: 'email', KeyType: 'HASH' }],
       Projection: { ProjectionType: 'ALL' },
       ProvisionedThroughput: {
         ReadCapacityUnits: 5,
@@ -29,8 +39,8 @@ export const AuthorsTableDefinition: CreateTableCommandInput = {
       },
     },
     {
-      IndexName: 'EmailIndex',
-      KeySchema: [{ AttributeName: 'email', KeyType: 'HASH' }],
+      IndexName: 'CreatedAtIndex',
+      KeySchema: [{ AttributeName: 'createdAt', KeyType: 'HASH' }],
       Projection: { ProjectionType: 'ALL' },
       ProvisionedThroughput: {
         ReadCapacityUnits: 5,
@@ -57,6 +67,7 @@ export const BooksTableDefinition: CreateTableCommandInput = {
     { AttributeName: 'cover', AttributeType: 'S' },
     { AttributeName: 'pdf', AttributeType: 'S' },
     { AttributeName: 'borrowerId', AttributeType: 'S' },
+    { AttributeName: 'rating', AttributeType: 'N' },
   ],
   GlobalSecondaryIndexes: [
     {
@@ -128,6 +139,15 @@ export const BooksTableDefinition: CreateTableCommandInput = {
     {
       IndexName: 'PdfIndex',
       KeySchema: [{ AttributeName: 'pdf', KeyType: 'HASH' }],
+      Projection: { ProjectionType: 'ALL' },
+      ProvisionedThroughput: {
+        ReadCapacityUnits: 5,
+        WriteCapacityUnits: 5,
+      },
+    },
+    {
+      IndexName: 'RatingIndex',
+      KeySchema: [{ AttributeName: 'rating', KeyType: 'HASH' }],
       Projection: { ProjectionType: 'ALL' },
       ProvisionedThroughput: {
         ReadCapacityUnits: 5,

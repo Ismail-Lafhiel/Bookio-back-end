@@ -61,5 +61,5 @@ export class CreateAuthorDto {
   @ValidateNested()
   @IsOptional()
   @Type(() => SocialMedia)
-  socialMedia?: string[];
+  socialMedia?: SocialMedia;
 }

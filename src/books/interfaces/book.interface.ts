@@ -15,6 +15,7 @@ export interface Book {
   updatedAt: string;
   startDate?: string;
   returnDate?: string;
+  rating?: number;
 }
 
 export enum BookStatus {
