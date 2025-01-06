@@ -38,16 +38,23 @@ export class AuthorsController {
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(FileInterceptor('profilePicture'))
   async create(
-    @Body(new ValidationPipe({ transform: true })) createAuthorDto: CreateAuthorDto,
+    @Body(new ValidationPipe({ transform: true }))
+    createAuthorDto: CreateAuthorDto,
     @UploadedFile() profilePicture: Express.Multer.File,
   ): Promise<Author> {
     this.logger.log(`Creating new author with name: ${createAuthorDto.name}`);
     try {
-      const author = await this.authorsService.create(createAuthorDto, profilePicture);
+      const author = await this.authorsService.create(
+        createAuthorDto,
+        profilePicture,
+      );
       this.logger.log(`Author created successfully with ID: ${author.id}`);
       return author;
     } catch (error) {
-      this.logger.error(`Failed to create author: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to create author: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -57,14 +64,21 @@ export class AuthorsController {
   async findAll(
     @Query('limit') limit = 10,
     @Query('lastEvaluatedKey') lastEvaluatedKey?: string,
-  ): Promise<{ message: string; authors: Author[]; lastEvaluatedKey?: string }> {
+  ): Promise<{
+    message: string;
+    authors: Author[];
+    lastEvaluatedKey?: string;
+  }> {
     this.logger.log('Fetching all authors');
     try {
       const result = await this.authorsService.findAll(limit, lastEvaluatedKey);
       this.logger.log(`Found ${result.authors.length} authors`);
       return result;
     } catch (error) {
-      this.logger.error(`Failed to fetch authors: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch authors: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -75,35 +89,55 @@ export class AuthorsController {
     @Query('name') name: string,
     @Query('limit') limit = 10,
     @Query('lastEvaluatedKey') lastEvaluatedKey?: string,
-  ): Promise<{ message: string; authors: Author[]; lastEvaluatedKey?: string }> {
+  ): Promise<{
+    message: string;
+    authors: Author[];
+    lastEvaluatedKey?: string;
+  }> {
     this.logger.log(`Searching for author with name: ${name}`);
     try {
-      const result = await this.authorsService.findByName(name, limit, lastEvaluatedKey);
-      this.logger.log(`Found ${result.authors.length} authors matching name: ${name}`);
+      const result = await this.authorsService.findByName(
+        name,
+        limit,
+        lastEvaluatedKey,
+      );
+      this.logger.log(
+        `Found ${result.authors.length} authors matching name: ${name}`,
+      );
       return result;
     } catch (error) {
-      this.logger.error(`Failed to search authors by name: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to search authors by name: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Get(':id')
   @HttpCode(HttpStatus.OK)
-  async findOne(@Param('id') id: string): Promise<{ message: string; author: Author }> {
+  async findOne(
+    @Param('id') id: string,
+  ): Promise<{ message: string; author: Author }> {
     this.logger.log(`Fetching author with ID: ${id}`);
     try {
       const result = await this.authorsService.findOne(id);
       this.logger.log(`Found author: ${result.author.name}`);
       return result;
     } catch (error) {
-      this.logger.error(`Failed to fetch author: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch author: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
 
   @Get(':id/books')
   @HttpCode(HttpStatus.OK)
-  async findBooksByAuthor(@Param('id', ParseUUIDPipe) authorId: string): Promise<{ message: string; books: Book[] }> {
+  async findBooksByAuthor(
+    @Param('id', ParseUUIDPipe) authorId: string,
+  ): Promise<{ message: string; books: Book[] }> {
     return this.authorsService.findBooksByAuthor(authorId);
   }
 
@@ -114,16 +148,24 @@ export class AuthorsController {
   @UseInterceptors(FileInterceptor('profilePicture'))
   async update(
     @Param('id') id: string,
-    @Body(new ValidationPipe({ transform: true })) updateAuthorDto: UpdateAuthorDto,
+    @Body(new ValidationPipe({ transform: true }))
+    updateAuthorDto: UpdateAuthorDto,
     @UploadedFile() profilePicture: Express.Multer.File,
   ): Promise<{ message: string; author: Author }> {
     this.logger.log(`Updating author with ID: ${id}`);
     try {
-      const result = await this.authorsService.update(id, updateAuthorDto, profilePicture);
+      const result = await this.authorsService.update(
+        id,
+        updateAuthorDto,
+        profilePicture,
+      );
       this.logger.log(`Author ${id} updated successfully`);
       return result;
     } catch (error) {
-      this.logger.error(`Failed to update author: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to update author: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -139,7 +181,10 @@ export class AuthorsController {
       this.logger.log(`Author ${id} deleted successfully`);
       return result;
     } catch (error) {
-      this.logger.error(`Failed to delete author: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to delete author: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }

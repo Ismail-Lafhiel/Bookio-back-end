@@ -15,6 +15,7 @@ import {
   Request,
   Query,
   InternalServerErrorException,
+  ParseIntPipe,
 } from '@nestjs/common';
 import { FileFieldsInterceptor } from '@nestjs/platform-express';
 import { BooksService } from './books.service';
@@ -107,7 +108,11 @@ export class BooksController {
     @Query('limit') limit = 10,
     @Query('lastEvaluatedKey') lastEvaluatedKey?: string,
   ): Promise<{ message: string; books: Book[]; lastEvaluatedKey?: string }> {
-    return this.booksService.findByCategory(categoryId, limit, lastEvaluatedKey);
+    return this.booksService.findByCategory(
+      categoryId,
+      limit,
+      lastEvaluatedKey,
+    );
   }
 
   @Get('author/:authorId')
@@ -115,6 +120,30 @@ export class BooksController {
     @Param('authorId', ParseUUIDPipe) authorId: string,
   ): Promise<{ message: string; books: Book[] }> {
     return this.booksService.findByAuthor(authorId);
+  }
+
+  @Get('rating/:rating')
+  async findByRating(
+    @Param('rating', ParseIntPipe) rating: number,
+  ): Promise<{ message: string; books: Book[] }> {
+    return this.booksService.findByRating(rating);
+  }
+
+  @Get('search/query')
+  async search(
+    @Query('query') query: string,
+  ): Promise<{ message: string; books: Book[] }> {
+    if (!query) {
+      throw new BadRequestException('Search query is required');
+    }
+    return this.booksService.search(query);
+  }
+
+  @Get('title/:title')
+  async findByTitle(
+    @Param('title') name: string,
+  ): Promise<{ message: string; books: Book[] }> {
+    return this.booksService.findByTitle(name);
   }
 
   @Patch(':id')
@@ -195,6 +224,16 @@ export class BooksController {
       }
       throw new InternalServerErrorException('Failed to borrow book');
     }
+  }
+
+  @Post(':id/return')
+  @UseGuards(CognitoAuthGuard)
+  async returnBook(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req, // Add this to get the user context
+  ): Promise<Book> {
+    const userId = req.user.sub; // Get the user ID
+    return this.booksService.returnBook(id, userId); // Pass userId to service
   }
 
   @Delete(':id')

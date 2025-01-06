@@ -22,6 +22,7 @@ import {
 import { CategoriesService } from '../categories/categories.service';
 import { AuthorsService } from '../authors/authors.service';
 import { BorrowBookDto } from './dto/borrow-book.dto';
+import { BookNotFoundException } from './exceptions/book.exceptions';
 
 @Injectable()
 export class BooksService {
@@ -521,6 +522,216 @@ export class BooksService {
       throw new InternalServerErrorException(
         `Failed to fetch borrowed books: ${error.message}`,
       );
+    }
+  }
+
+  async findByRating(
+    rating: number,
+  ): Promise<{ message: string; books: Book[] }> {
+    try {
+      const params: any = {
+        TableName: this.tableName,
+        IndexName: 'RatingIndex',
+        KeyConditionExpression: 'rating = :rating',
+        ExpressionAttributeValues: {
+          ':rating': rating,
+        },
+      };
+
+      const command = new QueryCommand(params);
+      const response = await this.dynamoDBService.documentClient.send(command);
+      const books = response.Items as Book[];
+
+      return {
+        message: 'Books retrieved successfully',
+        books,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to fetch books by rating: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to fetch books by rating');
+    }
+  }
+
+  async search(query: string): Promise<{ message: string; books: Book[] }> {
+    try {
+      const lowercaseQuery = query.toLowerCase().trim();
+      const queryWords = lowercaseQuery
+        .split(' ')
+        .filter((word) => word.length > 0);
+
+      const params = {
+        TableName: this.tableName,
+        FilterExpression: queryWords
+          .map(
+            (_, index) =>
+              `contains(#title, :query${index}) OR contains(#author, :query${index})`,
+          )
+          .join(' OR '),
+        ExpressionAttributeNames: {
+          '#title': 'title',
+          '#author': 'author',
+        },
+        ExpressionAttributeValues: queryWords.reduce(
+          (acc, word, index) => ({
+            ...acc,
+            [`:query${index}`]: word,
+          }),
+          {},
+        ),
+      };
+
+      this.logger.debug('Search params:', JSON.stringify(params, null, 2));
+
+      const command = new ScanCommand(params);
+      const response = await this.dynamoDBService.documentClient.send(command);
+
+      const books = (response.Items || []) as Book[];
+
+      // Sort results by relevance
+      const sortedBooks = books.sort((a, b) => {
+        const aMatches = queryWords.filter(
+          (word) =>
+            a.title.toLowerCase().includes(word) ||
+            (a.author && a.author.toLowerCase().includes(word)),
+        ).length;
+        const bMatches = queryWords.filter(
+          (word) =>
+            b.title.toLowerCase().includes(word) ||
+            (b.author && b.author.toLowerCase().includes(word)),
+        ).length;
+        return bMatches - aMatches;
+      });
+
+      return {
+        message:
+          sortedBooks.length > 0
+            ? `Found ${sortedBooks.length} books matching "${query}"`
+            : `No books found matching "${query}"`,
+        books: sortedBooks,
+      };
+    } catch (error) {
+      this.logger.error('Search error:', error);
+      throw new InternalServerErrorException(
+        `Failed to search books: ${error.message}`,
+      );
+    }
+  }
+
+  async returnBook(id: string, userId: string): Promise<Book> {
+    try {
+      const book = await this.findOne(id);
+
+      // Check if the book exists and is borrowed by this user
+      if (book.status !== BookStatus.BORROWED) {
+        throw new BadRequestException(
+          `Book with ID "${id}" is not currently borrowed`,
+        );
+      }
+
+      if (book.borrowerId !== userId) {
+        throw new BadRequestException(
+          `Book with ID "${id}" was not borrowed by you`,
+        );
+      }
+
+      const newQuantity = book.quantity + 1;
+
+      const updateExpression =
+        'SET #borrowerId = :borrowerId, #quantity = :quantity, #status = :status, updatedAt = :updatedAt';
+
+      const expressionAttributeValues = {
+        ':borrowerId': null,
+        ':quantity': newQuantity,
+        ':status': BookStatus.AVAILABLE,
+        ':updatedAt': new Date().toISOString(),
+      };
+
+      const expressionAttributeNames = {
+        '#borrowerId': 'borrowerId',
+        '#quantity': 'quantity',
+        '#status': 'status',
+      };
+
+      const result = await this.dynamoDBService.documentClient.send(
+        new UpdateCommand({
+          TableName: this.tableName,
+          Key: { id },
+          UpdateExpression: updateExpression,
+          ExpressionAttributeValues: expressionAttributeValues,
+          ExpressionAttributeNames: expressionAttributeNames,
+          ReturnValues: 'ALL_NEW',
+          ConditionExpression: 'attribute_exists(id)',
+        }),
+      );
+
+      const updatedBook = result.Attributes as Book;
+      this.logger.log(`Book ${id} returned successfully`);
+
+      return updatedBook;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        this.logger.error(`Book not found: ${error.message}`, error.stack);
+        throw error;
+      } else if (error instanceof BadRequestException) {
+        this.logger.error(`Book not available: ${error.message}`, error.stack);
+        throw error;
+      } else {
+        this.logger.error(
+          `Failed to return book: ${error.message}`,
+          error.stack,
+        );
+        throw new InternalServerErrorException(
+          `Failed to return book: ${error.message}`,
+        );
+      }
+    }
+  }
+
+  async findByTitle(
+    title: string,
+  ): Promise<{ message: string; books: Book[] }> {
+    try {
+      const normalizedTitle = title.trim();
+
+      this.logger.log(
+        `Searching for books with normalized title: "${normalizedTitle}"`,
+      );
+
+      const params: any = {
+        TableName: this.tableName,
+        IndexName: 'TitleIndex',
+        KeyConditionExpression: '#title = :title',
+        ExpressionAttributeNames: {
+          '#title': 'title',
+        },
+        ExpressionAttributeValues: {
+          ':title': normalizedTitle,
+        },
+      };
+
+      const command = new QueryCommand(params);
+      const response = await this.dynamoDBService.documentClient.send(command);
+      const books = response.Items as Book[];
+
+      if (!books || books.length === 0) {
+        this.logger.warn(`No books found with title: "${normalizedTitle}"`);
+      } else {
+        this.logger.log(`Books found with title: "${normalizedTitle}"`);
+      }
+
+      return {
+        message: 'Books retrieved successfully',
+        books,
+      };
+    } catch (error) {
+      this.logger.error(
+        `Failed to fetch books by title: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException('Failed to fetch books by title');
     }
   }
 }

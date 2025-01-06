@@ -352,6 +352,33 @@ export class AuthorsService {
     }
   }
 
+  async removeBookFromAuthor(authorId: string): Promise<void> {
+    try {
+      const command = new UpdateCommand({
+        TableName: this.tableName,
+        Key: { id: authorId },
+        UpdateExpression: 'SET booksCount = booksCount - :dec',
+        ExpressionAttributeValues: {
+          ':dec': 1,
+          ':zero': 0,
+        },
+        ConditionExpression: 'booksCount > :zero',
+      });
+
+      await this.dynamoDBService.documentClient.send(command);
+      this.logger.log(`Removed book from author: ${authorId}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to remove book from author: ${error.message}`,
+        error.stack,
+      );
+      if (error.name === 'ConditionalCheckFailedException') {
+        throw new Error('Cannot decrease books count below zero');
+      }
+      throw new Error(`Failed to remove book from author: ${error.message}`);
+    }
+  }
+
   async incrementBooksCount(id: string): Promise<void> {
     try {
       const command = new UpdateCommand({

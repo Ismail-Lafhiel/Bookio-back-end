@@ -1,8 +1,9 @@
 import { HttpException, HttpStatus } from '@nestjs/common';
 
-export class BookNotFoundException extends HttpException {
+export class BookNotFoundException extends Error {
   constructor(id: string) {
-    super(`Book with ID "${id}" not found`, HttpStatus.NOT_FOUND);
+    super(`Book with ID ${id} not found`);
+    this.name = 'BookNotFoundException';
   }
 }
 

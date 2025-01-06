@@ -78,7 +78,14 @@ export class CategoriesService {
     }
   }
 
-  async findAll(limit: number, lastEvaluatedKey?: string): Promise<{ message: string; categories: Category[]; lastEvaluatedKey?: string }> {
+  async findAll(
+    limit: number,
+    lastEvaluatedKey?: string,
+  ): Promise<{
+    message: string;
+    categories: Category[];
+    lastEvaluatedKey?: string;
+  }> {
     try {
       const params: any = {
         TableName: this.tableName,
@@ -103,11 +110,19 @@ export class CategoriesService {
       return {
         message: 'Categories retrieved successfully',
         categories,
-        lastEvaluatedKey: response.LastEvaluatedKey ? response.LastEvaluatedKey.id : undefined,
+        lastEvaluatedKey: response.LastEvaluatedKey
+          ? response.LastEvaluatedKey.id
+          : undefined,
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch categories: ${error.message}`, error.stack);
-      throw new HttpException('Failed to fetch categories', HttpStatus.INTERNAL_SERVER_ERROR);
+      this.logger.error(
+        `Failed to fetch categories: ${error.message}`,
+        error.stack,
+      );
+      throw new HttpException(
+        'Failed to fetch categories',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -140,7 +155,11 @@ export class CategoriesService {
     }
   }
 
-  async findByName(name: string, limit: number, lastEvaluatedKey?: string): Promise<{ categories: Category[]; lastEvaluatedKey?: string }> {
+  async findByName(
+    name: string,
+    limit: number,
+    lastEvaluatedKey?: string,
+  ): Promise<{ categories: Category[]; lastEvaluatedKey?: string }> {
     try {
       const params: any = {
         TableName: this.tableName,
@@ -169,14 +188,22 @@ export class CategoriesService {
 
       return {
         categories,
-        lastEvaluatedKey: response.LastEvaluatedKey ? response.LastEvaluatedKey.id : undefined,
+        lastEvaluatedKey: response.LastEvaluatedKey
+          ? response.LastEvaluatedKey.id
+          : undefined,
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch categories by name ${name}: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to fetch categories by name ${name}: ${error.message}`,
+        error.stack,
+      );
       if (error instanceof CategoryNotFoundByNameException) {
         throw error;
       }
-      throw new HttpException('Failed to fetch categories by name', HttpStatus.INTERNAL_SERVER_ERROR);
+      throw new HttpException(
+        'Failed to fetch categories by name',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
     }
   }
 
@@ -292,6 +319,33 @@ export class CategoriesService {
         throw error;
       }
       throw new CategoryDeleteException(error.message);
+    }
+  }
+  
+  async removeBookFromCategory(categoryId: string): Promise<void> {
+    try {
+      const command = new UpdateCommand({
+        TableName: this.tableName,
+        Key: { id: categoryId },
+        UpdateExpression: 'SET booksCount = booksCount - :dec',
+        ExpressionAttributeValues: {
+          ':dec': 1,
+          ':zero': 0,
+        },
+        ConditionExpression: 'booksCount > :zero',
+      });
+
+      await this.dynamoDBService.documentClient.send(command);
+      this.logger.log(`Removed book from category: ${categoryId}`);
+    } catch (error) {
+      this.logger.error(
+        `Failed to remove book from category: ${error.message}`,
+        error.stack,
+      );
+      if (error.name === 'ConditionalCheckFailedException') {
+        throw new Error('Cannot decrease books count below zero');
+      }
+      throw new Error(`Failed to remove book from category: ${error.message}`);
     }
   }
 
